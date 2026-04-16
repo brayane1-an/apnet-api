@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "user": {
+      "title": "User Profile",
+      "description": "User profile containing public and private information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier for the user." },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "role": { "type": "string", "enum": ["PROVIDER", "SEEKER", "ADMIN"] },
+        "email": { "type": "string", "format": "email" },
+        "walletBalance": { "type": "number" },
+        "isVerified": { "type": "boolean" }
+      },
+      "required": ["uid", "firstName", "role"]
+    },
+    "kyc": {
+      "title": "KYC Document",
+      "description": "Sensitive identity documents for verification.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "documentUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "documentUrl"]
+    },
+    "service": {
+      "title": "Service Listing",
+      "description": "A service offered by a provider.",
+      "type": "object",
+      "properties": {
+        "providerId": { "type": "string" },
+        "category": { "type": "string" },
+        "subCategory": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" }
+      },
+      "required": ["providerId", "category", "price"]
+    },
+    "transaction": {
+      "title": "Transaction",
+      "description": "Financial transaction record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["PENDING", "PAID", "FAILED"] },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "status"]
+    },
+    "message": {
+      "title": "Message",
+      "description": "Private message between two users.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "receiverId", "content"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "User profiles."
+    },
+    "/users/{userId}/kyc/{docId}": {
+      "schema": "kyc",
+      "description": "Sensitive KYC documents."
+    },
+    "/services/{serviceId}": {
+      "schema": "service",
+      "description": "Public service catalog."
+    },
+    "/transactions/{transId}": {
+      "schema": "transaction",
+      "description": "Financial transactions."
+    },
+    "/messages/{msgId}": {
+      "schema": "message",
+      "description": "Private messages."
+    }
+  }
+}

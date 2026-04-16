@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: apnet-api
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SOURCETABLE_API_KEY
+        value: apnet_sec_9823_dash_771
+      - key: CINETPAY_API_KEY
+        sync: false # To be set in Render Dashboard
+      - key: CINETPAY_SITE_ID
+        sync: false # To be set in Render Dashboard
+      - key: APP_URL
+        sync: false # Your Render URL
