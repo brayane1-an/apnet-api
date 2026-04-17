@@ -209,48 +209,34 @@ async function startServer() {
     }
 
     try {
-      // 1. Fetch Providers
-      const providersSnapshot = await db.collection('users')
-        .where('role', '==', 'PROVIDER')
-        .get();
-      
-      const providers = providersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as any)
-      }));
+      // STATIC TEST DATA FOR DASHBOARDING
+      const testProviders = [
+        { name: "Samba Diallo", email: "samba@example.com", job: "Plombier", verified: true, balance: 45000 },
+        { name: "Awa Koné", email: "awa@example.com", job: "Électricienne", verified: true, balance: 120000 },
+        { name: "Koffi Yao", email: "koffi@example.com", job: "Menuisier", verified: false, balance: 0 },
+        { name: "Fatou Traoré", email: "fatou@example.com", job: "Peintre", verified: true, balance: 75200 },
+        { name: "Moussa Diakité", email: "moussa@example.com", job: "Ménage", verified: true, balance: 30000 }
+      ];
 
-      // 2. Fetch Paid Transactions for Revenue
-      const transactionsSnapshot = await db.collection('transactions')
-        .where('status', '==', 'PAID')
-        .get();
-      
-      const transactions = transactionsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as any)
-      }));
+      const testTransactions = [
+        { date: new Date().toISOString(), amount: 15000, status: "PAID", description: "Réparation fuite évier" },
+        { date: new Date(Date.now() - 86400000).toISOString(), amount: 50000, status: "PAID", description: "Installation tableau électrique" },
+        { date: new Date(Date.now() - 172800000).toISOString(), amount: 25000, status: "PAID", description: "Peinture chambre" },
+        { date: new Date(Date.now() - 259200000).toISOString(), amount: 12500, status: "PAID", description: "Nettoyage salon" },
+        { date: new Date(Date.now() - 345600000).toISOString(), amount: 30000, status: "PAID", description: "Fabrication étagère" }
+      ];
 
-      const totalRevenue = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+      const totalRevenue = testTransactions.reduce((sum, t) => sum + t.amount, 0);
 
-      // 3. Prepare data for Sourcetable
       res.json({
         summary: {
-          totalProviders: providers.length,
+          totalProviders: testProviders.length,
           totalRevenue: totalRevenue,
-          currency: 'XOF'
+          currency: 'XOF',
+          isTestData: true
         },
-        providers: providers.map(p => ({
-          name: `${p.firstName} ${p.lastName || ''}`,
-          email: p.email,
-          job: p.jobTitle,
-          verified: p.isVerified,
-          balance: p.walletBalance
-        })),
-        recentTransactions: transactions.slice(0, 50).map(t => ({
-          date: t.paidAt ? (t.paidAt as admin.firestore.Timestamp).toDate().toISOString() : t.createdAt,
-          amount: t.amount,
-          status: t.status,
-          description: t.description
-        }))
+        providers: testProviders,
+        recentTransactions: testTransactions
       });
     } catch (error: any) {
       console.error('Sourcetable API Error:', error.message);
