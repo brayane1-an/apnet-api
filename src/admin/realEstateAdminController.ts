@@ -20,7 +20,7 @@ export const realEstateAdminController = {
     await new Promise(resolve => setTimeout(resolve, 500));
     const idx = dbProperties.findIndex(p => p.id === id);
     if (idx > -1) {
-      dbProperties[idx] = { ...dbProperties[idx], status: 'APPROVED' };
+      dbProperties[idx] = { ...dbProperties[idx], status: 'APPROVED', isActive: true };
       return true;
     }
     return false;
@@ -30,7 +30,7 @@ export const realEstateAdminController = {
     await new Promise(resolve => setTimeout(resolve, 500));
     const idx = dbProperties.findIndex(p => p.id === id);
     if (idx > -1) {
-      dbProperties[idx] = { ...dbProperties[idx], status: 'REJECTED' };
+      dbProperties[idx] = { ...dbProperties[idx], status: 'REJECTED', isActive: false };
       return true;
     }
     return false;

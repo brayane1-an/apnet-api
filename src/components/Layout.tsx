@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ViewState, UserProfile, UserRole, Notification } from '../types';
 import { Menu, X, MapPin, ShieldAlert, Wallet, LogIn, Megaphone, LockKeyhole, FileText, User, Bell, Trash2, Truck, Briefcase, Home, GraduationCap, Grid, MessageSquare, LayoutDashboard, ArrowLeft } from 'lucide-react';
+import { Logo } from './Logo';
 
 export const SecurityBanner = () => (
   <div className="bg-red-600 text-white px-4 py-3 shadow-md text-center relative z-50">
@@ -42,11 +43,10 @@ export const Header: React.FC<HeaderProps> = ({ currentView, setView, currentUse
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <div 
-              className="flex-shrink-0 flex items-center cursor-pointer" 
+              className="flex-shrink-0 flex items-center cursor-pointer group" 
               onClick={() => setView(ViewState.HOME)}
             >
-              <span className="text-2xl font-extrabold text-brand-green tracking-tighter">AP</span>
-              <span className="text-2xl font-extrabold text-brand-orange tracking-tighter">NET</span>
+              <Logo size="md" />
             </div>
             
             {/* DESKTOP MENU */}
@@ -293,9 +293,8 @@ export const Footer: React.FC<FooterProps> = ({ setView, currentUser }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <div className="flex items-center mb-4 cursor-pointer" onClick={() => setView(ViewState.HOME)}>
-              <span className="text-2xl font-extrabold text-brand-green tracking-tighter">AP</span>
-              <span className="text-2xl font-extrabold text-brand-orange tracking-tighter">NET</span>
+            <div className="flex items-center mb-4 cursor-pointer group" onClick={() => setView(ViewState.HOME)}>
+              <Logo size="md" variant="white" />
             </div>
             <p className="text-gray-400 text-sm">
               La plateforme de référence pour les services en Côte d'Ivoire. Fiable, rapide, sécurisé.

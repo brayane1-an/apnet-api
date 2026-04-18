@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { RealEstateListing, PropertyType, Location, ViewState, PropertyReview, UserProfile, UserRole } from '../types';
+import { RealEstateListing, PropertyType, Location, ViewState, PropertyReview, UserProfile, UserRole, UserStatus } from '../types';
 import { MOCK_REAL_ESTATE_LISTINGS, ABIDJAN_COMMUNES, NEARBY_LOCATIONS, RENTAL_VISIT_FEE, ROOM_VISIT_FEE, TENANT_ENGAGEMENT_TEXT } from '../constants';
-import { MapPin, Search, BedDouble, Bath, Wifi, Waves, Home, Star, PlusCircle, ArrowLeft, Check, AlertCircle, Camera, MessageCircle, Filter, EyeOff, Lock, Unlock, Calendar, Clock, User, Bed } from 'lucide-react';
+import { MapPin, Search, BedDouble, Bath, Wifi, Waves, Home, Star, PlusCircle, ArrowLeft, Check, AlertCircle, Camera, MessageCircle, Filter, EyeOff, Lock, Unlock, Calendar, Clock, User, Bed, CameraOff, X } from 'lucide-react';
 import { ImageUpload } from './ImageUpload';
 import { RoomCard } from './RoomCard'; // IMPORT DU NOUVEAU COMPOSANT
+import { PropertyCamera } from './PropertyCamera';
 
 interface RealEstateModuleProps {
   setView: (v: ViewState) => void;
@@ -118,6 +119,8 @@ const PropertyForm: React.FC<{ onCancel: () => void; onSubmit: (listing: RealEst
   const [isFurnished, setIsFurnished] = useState(false);
   const [hasPool, setHasPool] = useState(false);
   const [hasWifi, setHasWifi] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [showCamera, setShowCamera] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,10 +151,12 @@ const PropertyForm: React.FC<{ onCancel: () => void; onSubmit: (listing: RealEst
         wifi: hasWifi,
         surface: 0
       },
-      photos: ['https://images.unsplash.com/photo-1580587771525-78b9dba3b91d?auto=format&fit=crop&w=800&q=80'], // Mock photo
+      photos: photos.length > 0 ? photos : ['https://images.unsplash.com/photo-1580587771525-78b9dba3b91d?auto=format&fit=crop&w=800&q=80'], 
       availability: ['Disponible'],
       reviews: [],
-      rating: 0
+      rating: 0,
+      status: 'PENDING',
+      isActive: false
     };
     
     onSubmit(newListing);
@@ -301,12 +306,41 @@ const PropertyForm: React.FC<{ onCancel: () => void; onSubmit: (listing: RealEst
            ></textarea>
         </div>
 
-        {/* Photo Upload Placeholder using existing component if available or simple mock */}
-        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50 hover:bg-white transition cursor-pointer">
-           <Camera className="mx-auto text-gray-400 mb-2" size={32} />
-           <p className="text-sm text-gray-500 font-medium">Ajouter des photos (Simulé)</p>
-           <p className="text-xs text-gray-400">Cliquez pour sélectionner</p>
+        {/* Photo Upload & Camera */}
+        <div className="space-y-4">
+           <label className="block text-sm font-bold text-gray-700">Photos de votre bien</label>
+           
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {photos.map((photo, index) => (
+                <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200">
+                  <img src={photo} className="w-full h-full object-cover" alt={`Bien ${index}`} />
+                  <button 
+                    type="button"
+                    onClick={() => setPhotos(photos.filter((_, i) => i !== index))}
+                    className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              
+              <button 
+                type="button"
+                onClick={() => setShowCamera(true)}
+                className="aspect-square rounded-xl border-2 border-dashed border-brand-orange flex flex-col items-center justify-center gap-2 bg-orange-50/50 hover:bg-orange-50 transition text-brand-orange"
+              >
+                <Camera size={24} />
+                <span className="text-[10px] font-black uppercase tracking-tighter">Prendre Photo</span>
+              </button>
+           </div>
         </div>
+
+        {showCamera && (
+           <PropertyCamera 
+              onCapture={(url) => setPhotos([...photos, url])}
+              onClose={() => setShowCamera(false)}
+           />
+        )}
 
         <div className="flex gap-4 pt-4">
            <button type="button" onClick={onCancel} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-lg hover:bg-gray-200 transition">
@@ -447,8 +481,9 @@ export const RealEstateModule: React.FC<RealEstateModuleProps> = ({ setView, cur
   const baseListings = activeTab === 'HOUSES' ? houseListings : roomListings;
 
   const filteredListings = baseListings.filter(l => {
-       // Role-based Visibility (Admin sees all, Users see only available)
+       // Role-based Visibility (Admin sees all, Users see only available and approved)
        if (!isAdmin && l.availability.includes('Indisponible')) return false;
+       if (!isAdmin && (l.status !== 'APPROVED' || l.isActive === false)) return false;
 
        // Type Filter
        if (filterType && l.type !== filterType) return false;
@@ -517,7 +552,7 @@ export const RealEstateModule: React.FC<RealEstateModuleProps> = ({ setView, cur
 
   const handleListingAction = (listing: RealEstateListing, overridePrice?: number) => {
     if (!currentUser) {
-        alert("Veuillez vous connecter pour continuer.");
+        setView(ViewState.REGISTER);
         return;
     }
 
@@ -549,7 +584,7 @@ export const RealEstateModule: React.FC<RealEstateModuleProps> = ({ setView, cur
   const handleAddListing = (newListing: RealEstateListing) => {
      setListings([newListing, ...listings]);
      setMode('LIST');
-     alert("Votre annonce a été publiée avec succès !");
+     alert("Votre annonce a été soumise avec succès ! Elle sera visible sur la plateforme dès qu'elle aura été validée par un administrateur.");
   };
 
   return (
@@ -567,7 +602,17 @@ export const RealEstateModule: React.FC<RealEstateModuleProps> = ({ setView, cur
              </div>
              {mode === 'LIST' && (
                 <button 
-                  onClick={() => setMode('ADD')}
+                  onClick={() => {
+                    if (!currentUser) {
+                        setView(ViewState.REGISTER);
+                        return;
+                    }
+                    if (currentUser.status !== UserStatus.VERIFIE) {
+                        alert("Votre profil est en attente de vérification. Vous pourrez publier dès que vos documents KYC seront validés par l'administrateur.");
+                        return;
+                    }
+                    setMode('ADD');
+                  }}
                   className="bg-brand-orange text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-orange-600 transition flex items-center gap-2"
                 >
                   <PlusCircle size={20} />

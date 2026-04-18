@@ -7,7 +7,15 @@ service firebase.storage {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Dossier identites/ : Strictement privé. Seul l'admin et le propriétaire peuvent voir ces images.
+    // Dossier kyc_documents/ : Strictement privé (CNI, CV, Titres). Seul l'admin et le propriétaire y accèdent.
+    match /kyc_documents/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && (
+        request.auth.uid == userId || 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'ADMIN'
+      );
+    }
+
+    // Dossier identites/ : Ancien dossier (Legacy)
     match /identities/{userId}/{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == userId || 

@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { ABIDJAN_COMMUNES, SERVICE_CATEGORIES } from '../constants';
-import { UserRole, UserProfile, UserDocument } from '../types';
+import { UserRole, UserProfile, UserDocument, UserStatus } from '../types';
 import { authService } from '../services/authService';
 import { enhanceDescription } from '../services/geminiService';
 import { validateIdentityCard as aiCheckIdentity, validateCV as aiCheckCV } from '../services/geminiService'; // Renommé pour éviter conflit
 import { validateIdentityCard, validateCV } from '../services/fileValidator'; // Import du validateur local
+import { matriculeService } from '../services/matriculeService';
 import { 
   Sparkles, Loader2, Lock, User, Phone, Briefcase, MapPin, 
   FileText, Check, Upload, ArrowRight, LogIn, ChevronRight, 
-  ShieldCheck, ArrowLeft, Lightbulb, CheckCircle, AlertTriangle, AlertCircle, X, Key
+  ShieldCheck, ArrowLeft, Lightbulb, CheckCircle, AlertTriangle, AlertCircle, X, Key, Home
 } from 'lucide-react';
 import { ImageUpload } from './ImageUpload';
 import { auth } from '../firebase';
@@ -69,6 +70,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
   const [cniRectoFile, setCniRectoFile] = useState<File | null>(null);
   const [cniVersoFile, setCniVersoFile] = useState<File | null>(null);
   const [cvFile, setCvFile] = useState<File | null>(null);
+  const [titleDeedFile, setTitleDeedFile] = useState<File | null>(null);
 
   const [description, setDescription] = useState('');
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
@@ -265,6 +267,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
             if (!photoFile) { setError("La photo de profil est obligatoire pour les prestataires."); return; }
             if (!cniRectoFile || !cniVersoFile) { setError("La Carte Nationale d'Identité (Recto et Verso) est obligatoire."); return; }
             if (!cvFile) { setError("Le CV est obligatoire pour les prestataires."); return; }
+        } else if (role === UserRole.LANDLORD) {
+            if (!cniRectoFile || !cniVersoFile) { setError("La Carte Nationale d'Identité est obligatoire."); return; }
+            if (!titleDeedFile) { setError("Le Titre de Propriété ou l'Attestation Villageoise est obligatoire."); return; }
         } else {
             if (!cniRectoFile || !cniVersoFile) { setError("La Carte Nationale d'Identité (Recto et Verso) est obligatoire pour valider votre compte."); return; }
         }
@@ -348,46 +353,59 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
       setIsLoading(true);
       setError('');
       
-      try {
-        const userId = `user_${phone}_${Date.now()}`;
-        const documents: UserDocument[] = [];
-        let photoUrl = 'https://via.placeholder.com/150';
+        try {
+          const userId = `user_${phone}_${Date.now()}`;
+          const documents: UserDocument[] = [];
+          let photoUrl = 'https://via.placeholder.com/150';
 
-        // 1. Upload Photo de profil
-        if (photoFile) {
-          photoUrl = await storageService.uploadFile(photoFile, `users/${userId}/profile.jpg`);
-        }
+          // 1. Upload Photo de profil - Moved to kyc_documents for security consistency if needed, but profiles are often public
+          if (photoFile) {
+            photoUrl = await storageService.uploadFile(photoFile, `kyc_documents/${userId}/profile.jpg`);
+          }
 
-        // 2. Upload CNI Recto
-        if (cniRectoFile) {
-          const url = await storageService.uploadFile(cniRectoFile, `users/${userId}/cni_recto.${cniRectoFile.name.split('.').pop()}`);
-          documents.push({ type: 'CNI_RECTO', name: cniRectoFile.name, url });
-        }
+          // 2. Upload CNI Recto
+          if (cniRectoFile) {
+            const url = await storageService.uploadFile(cniRectoFile, `kyc_documents/${userId}/cni_recto.${cniRectoFile.name.split('.').pop()}`);
+            documents.push({ type: 'CNI_RECTO', name: cniRectoFile.name, url });
+          }
 
-        // 3. Upload CNI Verso
-        if (cniVersoFile) {
-          const url = await storageService.uploadFile(cniVersoFile, `users/${userId}/cni_verso.${cniVersoFile.name.split('.').pop()}`);
-          documents.push({ type: 'CNI_VERSO', name: cniVersoFile.name, url });
-        }
+          // 3. Upload CNI Verso
+          if (cniVersoFile) {
+            const url = await storageService.uploadFile(cniVersoFile, `kyc_documents/${userId}/cni_verso.${cniVersoFile.name.split('.').pop()}`);
+            documents.push({ type: 'CNI_VERSO', name: cniVersoFile.name, url });
+          }
 
-        // 4. Upload CV
-        if (cvFile && role === UserRole.PROVIDER) {
-          const url = await storageService.uploadFile(cvFile, `users/${userId}/cv.${cvFile.name.split('.').pop()}`);
-          documents.push({ type: 'CV', name: cvFile.name, url });
-        }
+          // 4. Upload CV
+          if (cvFile && role === UserRole.PROVIDER) {
+            const url = await storageService.uploadFile(cvFile, `kyc_documents/${userId}/cv.${cvFile.name.split('.').pop()}`);
+            documents.push({ type: 'CV', name: cvFile.name, url });
+          }
 
-        const newUser: UserProfile = {
-            id: userId,
-            role: role,
-            firstName,
-            lastName,
-            phone,
-            whatsapp: phone,
-            photoUrl: photoUrl,
-            location: { city, commune: city === 'Abidjan' ? commune : undefined, quartier },
-            verified: !!(cniRectoFile && cniVersoFile), 
-            password: createPin, 
-            description,
+          // 5. Upload Titre de Propriété (Landlord)
+          if (titleDeedFile && role === UserRole.LANDLORD) {
+            const url = await storageService.uploadFile(titleDeedFile, `kyc_documents/${userId}/titre_propriete.${titleDeedFile.name.split('.').pop()}`);
+            documents.push({ type: 'TITRE_PROPRIETE', name: titleDeedFile.name, url });
+          }
+
+          // 6. Génération automatique du Matricule (Artisans seulement)
+          let memberId = undefined;
+          if (role === UserRole.PROVIDER) {
+            memberId = await matriculeService.generate(subCategory || '', category || '');
+          }
+
+          const newUser: UserProfile = {
+              id: userId,
+              memberId: memberId,
+              role: role,
+              firstName,
+              lastName,
+              phone,
+              whatsapp: phone,
+              photoUrl: photoUrl,
+              location: { city, commune: city === 'Abidjan' ? commune : undefined, quartier },
+              verified: false, // Will be true after admin validation
+              status: UserStatus.EN_ATTENTE_DE_VALIDATION,
+              description,
             
             category: role === UserRole.PROVIDER ? category : undefined,
             subCategory: role === UserRole.PROVIDER ? subCategory : undefined,
@@ -621,6 +639,17 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
                         <div className="text-xs opacity-70">Je cherche un pro</div>
                     </div>
                 </div>
+
+                <div className="grid grid-cols-1 gap-4 mb-6">
+                    <div 
+                        onClick={() => setRole(UserRole.LANDLORD)}
+                        className={`p-4 rounded-xl border-2 cursor-pointer text-center transition ${role === UserRole.LANDLORD ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-100 hover:border-gray-200'}`}
+                    >
+                        <Home className="mx-auto mb-2" size={24}/>
+                        <div className="font-bold text-sm">Propriétaire Immobilier</div>
+                        <div className="text-xs opacity-70">Je propose un logement (Résidence/Maison)</div>
+                    </div>
+                </div>
                 {role === UserRole.PROVIDER && (
                     <>
                         <h4 className="font-bold text-gray-700 mb-2">Secteur d'activité</h4>
@@ -750,6 +779,25 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
                                     <AlertTriangle size={14}/> {cvError}
                                 </p>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* 4. TITRE DE PROPRIETE (Obligatoire pour Propriétaire uniquement) */}
+                {role === UserRole.LANDLORD && (
+                    <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-300">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Titre de Propriété / Attestation Villageoise</label>
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <input 
+                                    type="file" 
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={(e) => setTitleDeedFile(e.target.files?.[0] || null)}
+                                    className="text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                                />
+                                {titleDeedFile && <CheckCircle size={20} className="text-green-500" />}
+                            </div>
+                            <p className="text-[10px] text-gray-400">PDF ou Image haute qualité requise.</p>
                         </div>
                     </div>
                 )}

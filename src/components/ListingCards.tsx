@@ -148,10 +148,17 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onHire, on
           />
           <div className="flex-1">
             <div className="flex justify-between items-start">
-              <h3 className="text-lg font-bold text-gray-900 truncate">
-                {provider.firstName} {provider.lastName}
-              </h3>
-              <div className="flex items-center bg-yellow-50 px-2 py-1 rounded text-yellow-700">
+              <div className="flex flex-col truncate">
+                <h3 className="text-lg font-bold text-gray-900 truncate">
+                  {provider.firstName} {provider.lastName}
+                </h3>
+                {provider.memberId && (
+                  <span className="text-[10px] text-gray-400 font-mono tracking-wider">
+                    Matricule: {provider.memberId}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center bg-yellow-50 px-2 py-1 rounded text-yellow-700 flex-shrink-0">
                 <Star size={14} className="fill-current mr-1" />
                 <span className="text-sm font-bold">{provider.rating}</span>
                 <span className="text-xs text-yellow-600 ml-1">({provider.reviewCount})</span>

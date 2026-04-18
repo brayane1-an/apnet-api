@@ -4,6 +4,13 @@ export enum UserRole {
   SEEKER = 'SEEKER',     // Demandeur
   ADMIN = 'ADMIN',       // Administrateur APNET
   COMPANY = 'COMPANY',   // Entreprise / Recruteur
+  LANDLORD = 'LANDLORD', // Propriétaire Immobilier
+}
+
+export enum UserStatus {
+  EN_ATTENTE_DE_VALIDATION = 'EN_ATTENTE_DE_VALIDATION',
+  VERIFIE = 'VERIFIE',
+  REJETE = 'REJETE',
 }
 
 export enum ServiceMode {
@@ -110,6 +117,7 @@ export interface Advertisement {
   actionUrl: string; // Lien externe ou WhatsApp
   targetCategory?: string; // Si défini, s'affiche uniquement pour cette catégorie
   zone: 'TOP' | 'MIDDLE' | 'BOTTOM'; // Zone d'affichage sur la page d'accueil
+  slotId?: string; // Identifiant unique de l'emplacement (ex: PROMO_APNET_VIDEO)
   format: 'BANNER' | 'CARD';
   startDate: string;
   endDate: string;
@@ -256,7 +264,26 @@ export interface RealEstateListing {
   reviews: PropertyReview[];
   rating: number; // Avg rating
   isPromoted?: boolean;
+  isActive?: boolean;
   status?: 'PENDING' | 'APPROVED' | 'REJECTED';
+}
+
+export interface Landlord {
+  id?: string;
+  name: string;
+  phone: string;
+  location: string;
+  status: 'PENDING' | 'VALIDATED';
+  createdAt: string;
+}
+
+export interface CompletedWork {
+  id: string;
+  workerName: string;
+  workType: string;
+  location: string;
+  timestamp: string;
+  amount?: number;
 }
 
 // --- INTERNSHIP TYPES ---
@@ -350,7 +377,7 @@ export interface SubscriptionDetails {
 
 // --- NEW: USER DOCUMENTS ---
 export interface UserDocument {
-  type: 'CV' | 'CNI_RECTO' | 'CNI_VERSO' | 'DIPLOME' | 'AUTRE';
+  type: 'CV' | 'CNI_RECTO' | 'CNI_VERSO' | 'DIPLOME' | 'TITRE_PROPRIETE' | 'AUTRE';
   name: string;
   url: string; // Mock URL or Blob URL
 }
@@ -383,6 +410,7 @@ export interface Conversation {
 
 export interface UserProfile {
   id: string;
+  memberId?: string; // Matricule Professionnel (Ex: APN-ELEC-0001)
   role: UserRole;
   firstName: string;
   lastName: string;
@@ -391,6 +419,7 @@ export interface UserProfile {
   phone: string;
   whatsapp: string;
   verified: boolean;
+  status?: UserStatus;
   description: string;
   password?: string; // Stored securely (mocked here)
   

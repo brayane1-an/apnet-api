@@ -25,6 +25,32 @@ service cloud.firestore {
       allow write: if false; 
     }
 
+    match /orders/{orderId} {
+      function isValidOrder(data) {
+        return data.clientId is string &&
+               data.amount is number &&
+               data.status in ['PENDING', 'PAID', 'CANCELLED'] &&
+               data.order_type in ['INDIVIDUAL', 'TEAM_PROJECT'] &&
+               (data.order_type == 'INDIVIDUAL' || (
+                 data.team_details is map &&
+                 data.team_details.leader_id is string &&
+                 data.team_details.members is list
+               ));
+      }
+      allow read: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid || 
+        resource.data.providerId == request.auth.uid || 
+        (resource.data.order_type == 'TEAM_PROJECT' && request.auth.uid in resource.data.team_details.members) ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && isValidOrder(request.resource.data);
+      allow update: if isAuthenticated() && isValidOrder(request.resource.data) && (
+        resource.data.clientId == request.auth.uid || 
+        (resource.data.order_type == 'TEAM_PROJECT' && resource.data.team_details.leader_id == request.auth.uid) || 
+        isAdmin()
+      );
+    }
+
     match /identities/{identityId} {
       allow read: if isOwner(identityId) || isAdmin();
       allow create: if isOwner(identityId);

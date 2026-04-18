@@ -55,6 +55,31 @@
       },
       "required": ["userId", "amount", "status"]
     },
+    "order": {
+      "title": "Order (Commande)",
+      "description": "A service order, which can be individual or a team project.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "providerId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["PENDING", "PAID", "CANCELLED"] },
+        "order_type": { "type": "string", "enum": ["INDIVIDUAL", "TEAM_PROJECT"] },
+        "project_status": { "type": "string", "description": "Global state of the project (e.g., 'Equipe en route')." },
+        "team_details": {
+          "type": "object",
+          "properties": {
+            "leader_id": { "type": "string" },
+            "members": { "type": "array", "items": { "type": "string" } },
+            "attendance": { "type": "object", "description": "Map of members UIDs to arrival status (boolean)." }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "check_in_at": { "type": "string", "format": "date-time" },
+        "check_out_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "amount", "status", "order_type"]
+    },
     "message": {
       "title": "Message",
       "description": "Private message between two users.",
@@ -84,6 +109,10 @@
     "/transactions/{transId}": {
       "schema": "transaction",
       "description": "Financial transactions."
+    },
+    "/orders/{orderId}": {
+      "schema": "order",
+      "description": "Service orders."
     },
     "/messages/{msgId}": {
       "schema": "message",

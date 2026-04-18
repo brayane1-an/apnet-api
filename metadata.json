@@ -1,5 +1,6 @@
 {
-  "name": "Copy of Copy of Copy of Copy of APNET - Plateforme de Services",
+  "name": "APNET - Immobilier & Services",
   "description": "Plateforme de mise en relation entre prestataires et demandeurs de services en Côte d'Ivoire. Trouvez des artisans, des apprentis ou des emplois rapidement et en toute sécurité.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["camera"],
+  "requestPermissions": ["camera"]
 }

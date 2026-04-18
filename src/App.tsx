@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { 
-  ViewState, UserProfile, UserRole, JobOffer, Transaction, 
+  ViewState, UserProfile, UserRole, UserStatus, JobOffer, Transaction, 
   ServiceMode, PaymentMethod, RealEstateListing, PropertyType,
   InternshipRequest, DeliveryOrder, Advertisement, RiderLevel,
   InternshipOffer
@@ -18,6 +18,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 // Components
 import { Header, Footer, SecurityBanner, BackButton } from './components/Layout';
+import { Logo } from './components/Logo';
 import Hero from './components/Hero';
 import Filters from './components/Filters';
 import { ProviderCard, JobCard } from './components/ListingCards';
@@ -50,6 +51,7 @@ import { UserProfileView } from './components/UserProfileView';
 import { MessagesView } from './components/MessagesView';
 import { AdCarousel, CertifiedCompanies, AdvertiserCTA } from './components/AdRegistry';
 import { adService } from './services/adService';
+import { RealEstateFeed, WorksFeed, LandlordOnboardingForm } from './components/HomeFeed';
 
 export default function App() {
   const [view, setViewInternal] = useState<ViewState>(ViewState.HOME);
@@ -96,6 +98,11 @@ export default function App() {
 
   const [isBadWeather, setIsBadWeather] = useState(false);
   
+  // Automatic Scroll to Top on View Change (Standard SPA UX)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  }, [view]);
+
   // Expose setView to window for global access from components
   useEffect(() => {
     (window as any).setView = setView;
@@ -557,13 +564,15 @@ export default function App() {
 
   if (isLoadingSession) return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-          <div className="text-3xl font-extrabold text-brand-orange mb-4 tracking-tighter">APNET</div>
+          <Logo size="lg" className="mb-6" />
           <div className="text-sm text-gray-500 font-medium animate-pulse">Vérification de la session sécurisée...</div>
       </div>
   );
 
   const filteredProviders = users.filter(user => {
       if (user.role !== UserRole.PROVIDER) return false;
+      // KYC Security: Unverified providers are hidden from the public
+      if (user.status === UserStatus.EN_ATTENTE_DE_VALIDATION && currentUser?.role !== UserRole.ADMIN) return false;
       if (category && user.category !== category) return false;
       if (subCategory && user.subCategory !== subCategory) return false;
       if (location && user.location.commune !== location && user.location.city !== location) return false;
@@ -592,14 +601,18 @@ export default function App() {
                     className="w-full"
                 >
             {view === ViewState.HOME && (
-              <>
+              <div className="flex flex-col space-y-0">
                 <Hero setView={setView} currentUser={currentUser} />
+                
                 <AdCarousel 
                   ads={adService.getAllAds()} 
                   zone="TOP"
+                  slotId="PROMO_HEADER"
                   onInteract={adService.trackInteraction}
                 />
+
                 <OfficialMessage />
+
                 <CategoryGrid 
                   setView={setView} 
                   onSelectCategory={(cat) => {
@@ -607,22 +620,42 @@ export default function App() {
                     setView(ViewState.FIND_WORKER);
                   }} 
                 />
+
+                {/* --- FEED: IMMOBILIER À LA UNE --- */}
+                <RealEstateFeed 
+                  onSelect={(listing) => {
+                    // Logic to view the listing in RealEstateModule view
+                    // We can pass the listing ID via some global or local state if needed
+                    // For now, let's just go to REAL_ESTATE view
+                    setView(ViewState.REAL_ESTATE);
+                  }} 
+                />
+
+                {/* --- FEED: MIXITÉ BANNIÈRE --- */}
                 <AdCarousel 
                   ads={adService.getAllAds()} 
                   zone="MIDDLE"
+                  slotId="PROMO_APNET_VIDEO"
                   onInteract={adService.trackInteraction}
+                  onQuoteRequest={(c, s) => {
+                    setQuoteRequestDetails({ category: c, subCategory: s });
+                    setShowQuoteModal(true);
+                  }}
                 />
-                <div className="max-w-7xl mx-auto px-4 py-8">
-                  {/* FEATURE EXCLUSION: Only Seekers/Guests see this list */}
+
+                {/* --- FEED: TRAVAUX TERMINÉS --- */}
+                <WorksFeed />
+
+                <div className="max-w-7xl mx-auto px-4 py-12">
                   {currentUser?.role !== UserRole.PROVIDER && (
                     <>
                       <div className="flex justify-between items-center mb-6">
-                          <h2 className="text-2xl font-bold">Prestataires Recommandés</h2>
-                          <button onClick={() => setView(ViewState.FIND_WORKER)} className="text-brand-orange font-bold hover:underline">Voir tout</button>
+                          <h2 className="text-2xl font-black tracking-tight">Prestataires d'Exception</h2>
+                          <button onClick={() => setView(ViewState.FIND_WORKER)} className="text-brand-orange font-bold text-sm hover:underline">Voir tout</button>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                           {users
-                            .filter(u => u.role === UserRole.PROVIDER)
+                            .filter(u => u.role === UserRole.PROVIDER && (u.status !== UserStatus.EN_ATTENTE_DE_VALIDATION || currentUser?.role === UserRole.ADMIN))
                             .sort((a, b) => (b.isCertified ? 1 : 0) - (a.isCertified ? 1 : 0))
                             .slice(0, 4)
                             .map(p => (
@@ -638,16 +671,27 @@ export default function App() {
                     </>
                   )}
                 </div>
-                <Features />
-                <CertifiedCompanies />
+
+                {/* --- FEED: MIXITÉ BANNIÈRE 2 --- */}
                 <AdCarousel 
                   ads={adService.getAllAds()} 
                   zone="BOTTOM"
+                  slotId="PROMO_PARTENAIRE_IMAGE"
                   onInteract={adService.trackInteraction}
+                  onQuoteRequest={(c, s) => {
+                    setQuoteRequestDetails({ category: c, subCategory: s });
+                    setShowQuoteModal(true);
+                  }}
                 />
+
+                {/* --- FEED: DEVENIR PROPRIÉTAIRE --- */}
+                <LandlordOnboardingForm />
+
+                <Features />
+                <CertifiedCompanies />
                 <SafetyTips />
                 <AdvertiserCTA />
-              </>
+              </div>
             )}
 
             {view === ViewState.CATALOG && (

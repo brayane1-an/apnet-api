@@ -211,7 +211,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <img src={u.photoUrl} className="w-8 h-8 rounded-full bg-gray-200" />
                       <div>
                         <div className="font-bold text-gray-900">{u.firstName} {u.lastName}</div>
-                        <div className="text-xs text-gray-500">{u.phone}</div>
+                        <div className="text-xs text-gray-500">
+                          {u.phone} {u.memberId && <span className="ml-2 font-mono text-brand-orange bg-orange-50 px-1 rounded border border-orange-100">{u.memberId}</span>}
+                        </div>
                       </div>
                     </div>
                   </td>

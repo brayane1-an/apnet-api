@@ -10,6 +10,7 @@ export const MOCK_ADS: Advertisement[] = [
     actionUrl: 'https://wa.me/2250142341095',
     targetCategory: 'Bâtiment & Artisanat',
     zone: 'TOP',
+    slotId: 'PROMO_HEADER',
     format: 'BANNER',
     startDate: '2023-01-01',
     endDate: '2025-12-31',
@@ -27,6 +28,7 @@ export const MOCK_ADS: Advertisement[] = [
     actionUrl: 'https://wa.me/2250142341095',
     targetCategory: undefined, // General
     zone: 'MIDDLE',
+    slotId: 'PROMO_APNET_VIDEO',
     format: 'BANNER',
     startDate: '2023-01-01',
     endDate: '2025-12-31',
@@ -37,18 +39,73 @@ export const MOCK_ADS: Advertisement[] = [
   },
   {
     id: 'ad_3',
-    sponsorName: 'PropreNet Produits',
-    title: 'Kit de Nettoyage Pro',
-    body: 'Tout le matériel pour les femmes de ménage : balais, produits, gants. -20% pour les membres APNET.',
-    imageUrl: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=1000&auto=format&fit=crop',
-    actionUrl: 'https://wa.me/2250142341095',
-    targetCategory: 'Services à domicile',
+    sponsorName: 'Orange CI',
+    title: 'Orange Bank : Prêt immédiat',
+    body: 'Recevez jusqu\'à 500.000 F en 2 minutes via Orange Money.',
+    imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=1000&auto=format&fit=crop',
+    actionUrl: 'https://www.orange.ci',
+    targetCategory: undefined,
     zone: 'BOTTOM',
+    slotId: 'PROMO_PARTENAIRE_IMAGE',
     format: 'BANNER',
-    startDate: '2023-01-01',
+    startDate: '2024-01-01',
     endDate: '2025-12-31',
     views: 800,
     clicks: 30,
+    likes: [],
+    reviews: []
+  },
+  {
+    id: 'ad_5',
+    sponsorName: 'Wave CI',
+    title: 'Wave Mobile Money',
+    body: 'Transférez de l\'argent à 1% partout en Côte d\'Ivoire.',
+    imageUrl: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?q=80&w=1000&auto=format&fit=crop',
+    actionUrl: 'https://www.wave.com',
+    targetCategory: undefined,
+    zone: 'BOTTOM',
+    slotId: 'PROMO_PARTENAIRE_IMAGE',
+    format: 'BANNER',
+    startDate: '2024-01-01',
+    endDate: '2025-12-31',
+    views: 1200,
+    clicks: 85,
+    likes: [],
+    reviews: []
+  },
+  {
+    id: 'ad_6',
+    sponsorName: 'Moov Africa',
+    title: 'Forfaits Data Illimités',
+    body: 'Restez connectés avec la 4G+ de Moov Africa. Forfaits à partir de 100F.',
+    imageUrl: 'https://images.unsplash.com/photo-1512428559087-560fa5ceab42?q=80&w=1000&auto=format&fit=crop',
+    actionUrl: 'https://www.moov-africa.ci',
+    targetCategory: undefined,
+    zone: 'BOTTOM',
+    slotId: 'PROMO_PARTENAIRE_IMAGE',
+    format: 'BANNER',
+    startDate: '2024-01-01',
+    endDate: '2025-12-31',
+    views: 950,
+    clicks: 42,
+    likes: [],
+    reviews: []
+  },
+  {
+    id: 'ad_7',
+    sponsorName: 'UTB',
+    title: 'Voyagez en toute sécurité',
+    body: 'Réservez vos tickets UTB en ligne sur APNET et voyagez sereinement.',
+    imageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=1000&auto=format&fit=crop',
+    actionUrl: 'https://www.utb-ci.com',
+    targetCategory: undefined,
+    zone: 'BOTTOM',
+    slotId: 'PROMO_PARTENAIRE_IMAGE',
+    format: 'BANNER',
+    startDate: '2024-01-01',
+    endDate: '2025-12-31',
+    views: 1500,
+    clicks: 120,
     likes: [],
     reviews: []
   },
@@ -71,10 +128,19 @@ export const MOCK_ADS: Advertisement[] = [
   }
 ];
 // ... rest of the file remains unchanged ...
-import { UserProfile, UserRole, JobOffer, JobType, JobUrgency, Advertisement, RealEstateListing, PropertyType, RiderLevel, ProFeedback, ClientReview, InternshipRequest, InternshipType, InternshipStatus, DeliveryOrder, VehicleType, InternshipOffer } from './types';
+import { UserProfile, UserRole, JobOffer, JobType, JobUrgency, Advertisement, RealEstateListing, PropertyType, RiderLevel, ProFeedback, ClientReview, InternshipRequest, InternshipType, InternshipStatus, DeliveryOrder, VehicleType, InternshipOffer, CompletedWork } from './types';
 
 export const SERVICE_FEE_PERCENTAGE = 0.02; // 2% fee on standard transactions
 export const PLATFORM_MAINTENANCE_FEE = 50; // 50 FCFA flat fee for server/support on EVERY transaction
+
+export const MOCK_COMPLETED_WORKS: CompletedWork[] = [
+  { id: 'cw_1', workerName: 'Moussa', workType: 'Installation Électrique', location: 'Cocody', timestamp: new Date().toISOString() },
+  { id: 'cw_2', workerName: 'Fatou', workType: 'Plomberie Sanitaire', location: 'Yopougon', timestamp: new Date(Date.now() - 3600000).toISOString() },
+  { id: 'cw_3', workerName: 'Jean', workType: 'Peinture Façade', location: 'Marcory', timestamp: new Date(Date.now() - 7200000).toISOString() },
+  { id: 'cw_4', workerName: 'Kouassi', workType: 'Maçonnerie Fondations', location: 'Koumassi', timestamp: new Date(Date.now() - 10800000).toISOString() },
+  { id: 'cw_5', workerName: 'Aicha', workType: 'Nettoyage Industriel', location: 'Angré', timestamp: new Date(Date.now() - 14400000).toISOString() },
+];
+
 export const COMPANY_SUBSCRIPTION_FEE = 25000; // 25,000 FCFA for certification/premium badge
 export const UNLOCK_CONTACT_FEE = 1000; // 1000 FCFA flat fee for Long Term contracts
 export const PREMIUM_CANDIDATE_UNLOCK_FEE = 2000; // Fee for companies to see premium intern contacts
@@ -618,7 +684,9 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
         date: '2023-10-15'
       }
     ],
-    isPromoted: true
+    isPromoted: true,
+    status: 'APPROVED',
+    isActive: true
   },
   {
     id: 'prop_2',
@@ -641,6 +709,8 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
     availability: ['Week-end'],
     rating: 4.9,
     reviews: [],
+    status: 'APPROVED',
+    isActive: true
   },
   {
     id: 'prop_3',
@@ -662,7 +732,9 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
     photos: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'],
     availability: ['Immédiat'],
     rating: 4.0,
-    reviews: []
+    reviews: [],
+    status: 'APPROVED',
+    isActive: true
   },
   {
     id: 'prop_room_1',
@@ -684,7 +756,9 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
     photos: ['https://images.unsplash.com/photo-1598928636135-d146006ff4be?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'],
     availability: ['Disponible'],
     rating: 0,
-    reviews: []
+    reviews: [],
+    status: 'APPROVED',
+    isActive: true
   },
   {
     id: 'prop_room_2',
@@ -706,7 +780,9 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
     photos: ['https://images.unsplash.com/photo-1522771753035-0a1539503ed2?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'],
     availability: ['Disponible'],
     rating: 0,
-    reviews: []
+    reviews: [],
+    status: 'APPROVED',
+    isActive: true
   },
   {
     id: 'prop_unavailable_1',

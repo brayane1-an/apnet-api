@@ -222,7 +222,14 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({ user, onSwitch
                         <h3 className="font-bold flex items-center gap-2 text-brand-orange">
                             <Wallet size={20} /> Mon Compte & Solde
                         </h3>
-                        <span className="bg-gray-800 text-xs px-2 py-1 rounded text-gray-300">ID Unique: {user.phone}</span>
+                        <div className="flex flex-col items-end gap-1">
+                            <span className="bg-gray-800 text-xs px-2 py-1 rounded text-gray-300">ID Unique: {user.phone}</span>
+                            {user.memberId && (
+                                <span className="bg-brand-orange/20 text-brand-orange text-xs px-2 py-1 rounded border border-brand-orange/30 font-bold">
+                                    Matricule: {user.memberId}
+                                </span>
+                            )}
+                        </div>
                     </div>
                     
                     <div className="flex flex-col md:flex-row justify-between items-end gap-6">
