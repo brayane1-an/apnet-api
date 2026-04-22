@@ -33,11 +33,15 @@ export const RealEstateFeed: React.FC<{ onSelect: (l: RealEstateListing) => void
             className="flex-shrink-0 w-72 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden snap-start cursor-pointer group"
             onClick={() => onSelect(listing)}
           >
-            <div className="relative h-44 overflow-hidden">
+            <div className="relative h-44 overflow-hidden bg-gray-100">
               <img 
                 src={listing.photos[0]} 
                 alt={listing.title} 
+                referrerPolicy="no-referrer"
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                onError={(e) => {
+                  e.currentTarget.src = `https://picsum.photos/seed/${listing.id}/800/600`;
+                }}
               />
               <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest">
                 {listing.type}

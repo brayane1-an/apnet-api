@@ -71,7 +71,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, setView, currentUse
               </button>
               
               <button onClick={() => setView(ViewState.DELIVERY_ESTIMATOR)} className={navItemClass(ViewState.DELIVERY_ESTIMATOR)}>
-                <Truck size={14}/> Livreur Privé
+                <Truck size={14}/> Passer une course
               </button>
               
               <button onClick={() => setView(ViewState.INTERNSHIPS)} className={navItemClass(ViewState.INTERNSHIPS)}>
@@ -225,7 +225,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, setView, currentUse
             </button>
 
             <button onClick={() => { setView(ViewState.DELIVERY_ESTIMATOR); setIsMenuOpen(false); }} className={`block w-full text-left ${navItemClass(ViewState.DELIVERY_ESTIMATOR)}`}>
-              Livreur Privé
+              Passer une course
             </button>
             
             {isProvider && (
@@ -308,7 +308,7 @@ export const Footer: React.FC<FooterProps> = ({ setView, currentUser }) => {
               <li><button onClick={() => setView(ViewState.CATALOG)} className="hover:text-white transition-colors">Catalogue</button></li>
               <li><button onClick={() => setView(ViewState.FIND_WORKER)} className="hover:text-white transition-colors">Trouver un pro</button></li>
               <li><button onClick={() => setView(ViewState.REAL_ESTATE)} className="hover:text-white transition-colors">Immobilier</button></li>
-              <li><button onClick={() => setView(ViewState.DELIVERY_ESTIMATOR)} className="hover:text-white transition-colors">Livreur Privé</button></li>
+              <li><button onClick={() => setView(ViewState.DELIVERY_ESTIMATOR)} className="hover:text-white transition-colors">Passer une course</button></li>
               <li><button onClick={() => setView(ViewState.INTERNSHIPS)} className="hover:text-white transition-colors">Stages & Étudiants</button></li>
             </ul>
           </div>

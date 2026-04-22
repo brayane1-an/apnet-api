@@ -90,21 +90,30 @@ export const updateVisibility = (user: UserProfile, isPaid: boolean): UserProfil
 
 // PROMPT 3: Signature Numérique
 export const signContract = (
-  providerId: string, 
-  clientId: string, 
+  provider: UserProfile, 
+  client: UserProfile, 
   serviceTitle: string, 
-  amount: number
+  amount: number,
+  duration: string,
+  tasks: string[]
 ): DigitalContract => {
   return {
     id: `contrat_${Date.now()}`,
-    prestataire_id: providerId,
-    client_id: clientId,
+    prestataire_id: provider.id,
+    prestataire_name: `${provider.firstName} ${provider.lastName}`,
+    client_id: client.id,
+    client_name: `${client.firstName} ${client.lastName}`,
     service_title: serviceTitle,
     amount: amount,
+    duration: duration,
+    tasks: tasks,
+    startDate: new Date().toISOString(),
+    endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     signature_date: new Date().toISOString(),
-    signature_ip: '192.168.1.10', // Simulation IP
-    signature_status: 'signé',
-    terms_version: 'v1.2'
+    signature_ip: '192.168.1.10',
+    status: 'SIGNED',
+    terms_version: 'v1.2',
+    createdAt: new Date().toISOString()
   };
 };
 

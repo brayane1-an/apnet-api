@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Search, Briefcase, Home } from 'lucide-react';
+import { Search, Briefcase, Home, Sparkles } from 'lucide-react';
 import { ViewState, UserProfile } from '../types';
 
 interface HeroProps {
@@ -20,13 +20,21 @@ const Hero: React.FC<HeroProps> = ({ setView, currentUser }) => (
         <p className="text-xl text-gray-300 mb-8 max-w-2xl">
           APNET connecte artisans, apprentis et travailleurs qualifiés avec des entreprises et particuliers en Côte d'Ivoire. Fiable, rapide et sécurisé.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-4">
+          <button 
+            onClick={() => setView(ViewState.SMART_SEARCH)}
+            className="bg-brand-orange text-white font-bold py-4 px-8 rounded-full hover:bg-orange-600 transition shadow-lg flex items-center justify-center gap-2 border-2 border-brand-orange"
+          >
+            <Sparkles size={20} className="animate-pulse" />
+            Recherche Intelligente (IA)
+          </button>
+
           <button 
             onClick={() => setView(ViewState.CATALOG)}
-            className="bg-brand-orange text-white font-bold py-4 px-8 rounded-full hover:bg-orange-600 transition shadow-lg flex items-center justify-center gap-2"
+            className="bg-white text-brand-dark font-bold py-4 px-8 rounded-full hover:bg-gray-100 transition shadow-lg flex items-center justify-center gap-2"
           >
             <Search size={20} />
-            Parcourir le Catalogue
+            Catalogue
           </button>
 
           <button 

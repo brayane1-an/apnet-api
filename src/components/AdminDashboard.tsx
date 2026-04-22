@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Transaction, UserProfile, UserRole, ProFeedback, ClientReview, InternshipRequest, InternshipStatus, InternshipOffer } from '../types';
-import { Wallet, TrendingUp, PieChart, Building2, Download, Users, CheckCircle, XCircle, Search, Trophy, MessageSquare, Star, MessageCircle, Filter, GraduationCap, FileText, Send, Mail, AlertTriangle, CloudRain, Megaphone, ShieldCheck, MapPin, Clock, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Transaction, UserProfile, UserRole, ProFeedback, ClientReview, InternshipRequest, InternshipStatus, InternshipOffer, PrivateInternshipData } from '../types';
+import { Wallet, TrendingUp, PieChart, Building2, Download, Users, CheckCircle, XCircle, Search, Trophy, MessageSquare, Star, MessageCircle, Filter, GraduationCap, FileText, Send, Mail, AlertTriangle, CloudRain, Megaphone, ShieldCheck, MapPin, Clock, Plus, Trash2, Edit2, Lock } from 'lucide-react';
 import { RIDER_LEVEL_RULES } from '../constants';
 import { AdminUserModal } from './AdminUserModal';
 import { realEstateAdminController } from "../admin/realEstateAdminController";
@@ -17,6 +17,7 @@ interface AdminDashboardProps {
   proFeedbacks: ProFeedback[];
   clientReviews: ClientReview[];
   internshipRequests?: InternshipRequest[];
+  privateInternshipData?: PrivateInternshipData[];
   onUpdateInternshipStatus?: (id: string, status: InternshipStatus, companyName?: string) => void;
   internshipOffers?: InternshipOffer[];
   onUpdateOfferStatus?: (id: string, status: 'APPROVED' | 'REJECTED', reason?: string) => void;
@@ -28,12 +29,12 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
     balance, transactions, onWithdraw, users, onVerifyUser, proFeedbacks, clientReviews,
-    internshipRequests = [], onUpdateInternshipStatus, 
+    internshipRequests = [], privateInternshipData = [], onUpdateInternshipStatus, 
     internshipOffers = [], onUpdateOfferStatus,
     onApproveWithdrawal, onRejectWithdrawal,
     isBadWeather, onToggleBadWeather
 }) => {
-  const [activeTab, setActiveTab] = useState<'FINANCE' | 'USERS' | 'KYC' | 'FEEDBACK_PRO' | 'REVIEWS_CLIENT' | 'STAGES' | 'MODERATION_STAGES' | 'REAL_ESTATE' | 'WITHDRAWALS'>('FINANCE');
+  const [activeTab, setActiveTab] = useState<'FINANCE' | 'USERS' | 'KYC' | 'FEEDBACK_PRO' | 'REVIEWS_CLIENT' | 'STAGES' | 'MODERATION_STAGES' | 'REAL_ESTATE' | 'WITHDRAWALS' | 'ADS'>('FINANCE');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
   const commissionTransactions = transactions.filter(t => t.type === 'COMMISSION');
@@ -461,12 +462,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         <span className="text-xs text-gray-400 italic">Attente paiement étudiant...</span>
                                     )}
                                     {req.status === 'VALIDE' && (
-                                        <button 
-                                            onClick={() => alert(`Notification renvoyée à ${req.phone} avec les détails de ${req.matchedCompany}`)}
-                                            className="text-gray-500 hover:text-gray-700 flex items-center gap-1 ml-auto text-xs"
-                                        >
-                                            <Send size={12} /> Renvoyer Notif
-                                        </button>
+                                        <div className="flex flex-col gap-1 items-end ml-auto">
+                                            <button 
+                                                onClick={() => {
+                                                    const privateData = privateInternshipData.find(pd => pd.requestId === req.id);
+                                                    if (privateData) alert(`LETTRE DE MOTIVATION (CONFIDENTIEL APNET) :\n\n${privateData.aiCoverLetter}`);
+                                                    else alert("Aucune lettre IA trouvée pour cette demande.");
+                                                }}
+                                                className="text-brand-orange hover:text-orange-700 flex items-center gap-1 text-[10px] font-black uppercase"
+                                            >
+                                                <Lock size={12} /> Consulter Lettre IA
+                                            </button>
+                                            <button 
+                                                onClick={() => alert(`Notification renvoyée à ${req.phone} avec les détails de ${req.matchedCompany}`)}
+                                                className="text-gray-500 hover:text-gray-700 flex items-center gap-1 text-[10px]"
+                                            >
+                                                <Send size={12} /> Renvoyer Notif
+                                            </button>
+                                        </div>
                                     )}
                                 </td>
                             </tr>

@@ -51,10 +51,54 @@ service cloud.firestore {
       );
     }
 
+    match /missions/{missionId} {
+      function isValidMission(data) {
+        return data.keys().hasAll(['clientId', 'providerId', 'providerMatricule', 'type', 'description', 'status', 'createdAt', 'updatedAt']) &&
+               data.clientId == request.auth.uid &&
+               data.providerId is string &&
+               data.providerMatricule is string &&
+               data.type in ['ORDER', 'QUOTE'] &&
+               data.description is string && data.description.size() <= 3000 &&
+               data.status is string &&
+               data.createdAt == request.time &&
+               data.updatedAt == request.time;
+      }
+      allow read: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid || 
+        resource.data.providerId == request.auth.uid || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && isValidMission(request.resource.data);
+      allow update: if isAuthenticated() && (
+        resource.data.clientId == request.auth.uid || 
+        resource.data.providerId == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
     match /identities/{identityId} {
       allow read: if isOwner(identityId) || isAdmin();
       allow create: if isOwner(identityId);
       allow update, delete: if isAdmin();
+    }
+
+    // --- INTERNSHIP PLACEMENT PREMIUM SECURITY ---
+    match /internship_requests/{requestId} {
+      // Students can read their own basic request, but not the private details
+      allow read: if isAuthenticated() && (resource.data.studentId == request.auth.uid || isAdmin() || resource.data.companyId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.companyId == request.auth.uid);
+
+      // Private Data Sub-collection: AI cover letter is property of APNET
+      match /private/internal_data {
+        // STUDENT CANNOT READ (READ: FALSE for student)
+        // Only Admin and the Matched Company can read the generated contents
+        allow read: if isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/internship_requests/$(requestId)).data.companyId == request.auth.uid);
+        
+        // Student can create it (during submission) but immediately loses read access
+        allow create: if isAuthenticated(); 
+        allow update, delete: if isAdmin();
+      }
     }
   }
 }

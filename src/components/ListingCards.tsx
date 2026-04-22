@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { UserProfile, JobOffer, Location, JobUrgency, ServiceMode } from '../types';
-import { MapPin, Star, CheckCircle, MessageCircle, Users, Clock, Globe, Award, Wallet, ShieldCheck, Trophy, Zap, Medal, TrendingUp, Lock, Unlock, Phone, CalendarX, EyeOff, Briefcase, Eye, MessageSquare } from 'lucide-react';
+import { UserProfile, JobOffer, Location, JobUrgency, ServiceMode, ContractType } from '../types';
+import { MapPin, Star, CheckCircle, MessageCircle, Users, Clock, Globe, Award, Wallet, ShieldCheck, Trophy, Zap, Medal, TrendingUp, Lock, Unlock, Phone, CalendarX, EyeOff, Briefcase, Eye, MessageSquare, CalendarCheck, ClipboardList, ArrowRight } from 'lucide-react';
 import { UNLOCK_CONTACT_FEE } from '../constants';
 import { canViewContact, hasActivePass } from '../services/providerService';
 
@@ -106,7 +106,7 @@ const getNextMilestone = (completed: number) => {
 interface ProviderCardProps {
   provider: UserProfile;
   onHire: (provider: UserProfile) => void;
-  onDiscuss?: (provider: UserProfile) => void; // New for Daily
+  onDiscuss?: (provider: UserProfile, isQuote: boolean) => void; 
   serviceMode: ServiceMode; 
   currentUser: UserProfile | null;
 }
@@ -114,6 +114,15 @@ interface ProviderCardProps {
 export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onHire, onDiscuss, serviceMode, currentUser }) => {
   const badges = getTrustBadges(provider);
   const milestone = getNextMilestone(provider.completedJobs || 0);
+
+  // Professions éligibles au modèle "Agence de Placement"
+  const isPlacementProfession = 
+    provider.category === 'Services à domicile' || 
+    provider.subCategory?.includes('Serveur') ||
+    provider.subCategory?.includes('Ménage') ||
+    provider.subCategory?.includes('Nounou') ||
+    provider.subCategory?.includes('Chambre') ||
+    provider.subCategory?.includes('Gardien');
 
   // PROMPT 4: Check Availability
   const isBusy = provider.busyUntil && new Date(provider.busyUntil) > new Date();
@@ -141,11 +150,24 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onHire, on
 
       <div className="p-5 flex-1">
         <div className="flex items-start gap-4">
-          <img 
-            src={provider.photoUrl} 
-            alt={`${provider.firstName}`} 
-            className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm"
-          />
+          <div className="relative w-16 h-16 flex-shrink-0">
+            <img 
+              src={provider.photoUrl} 
+              alt={`${provider.firstName}`} 
+              referrerPolicy="no-referrer"
+              className="w-full h-full rounded-full object-cover border-2 border-white shadow-sm"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const parent = e.currentTarget.parentElement;
+                if (parent) {
+                  const fallback = document.createElement('div');
+                  fallback.className = "w-full h-full rounded-full bg-brand-orange flex items-center justify-center text-white font-black text-xl border-2 border-white shadow-sm";
+                  fallback.innerText = provider.firstName[0].toUpperCase();
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
+          </div>
           <div className="flex-1">
             <div className="flex justify-between items-start">
               <div className="flex flex-col truncate">
@@ -217,26 +239,39 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onHire, on
 
       {/* PROMPT 2: MASKING SECTION - CONTACTS & ACTION */}
       <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-2">
-        
         {/* OPTION B - DAILY: DISCUSS FIRST */}
         {serviceMode === ServiceMode.DAILY && (
             <>
                <div className="bg-white p-2 rounded border border-gray-200 text-center mb-2">
                   <div className="flex items-center justify-center gap-1 text-gray-500 text-xs mb-1">
-                     <EyeOff size={12} />
-                     <span className="font-semibold uppercase">Contacts Masqués</span>
+                     <ShieldCheck size={12} className="text-brand-orange" />
+                     <span className="font-semibold uppercase italic">Tiers de Confiance APNET</span>
                   </div>
                   <p className="text-[10px] text-gray-400">
-                    Discutez d'abord, payez après accord.
+                    {isPlacementProfession 
+                      ? "Salaire garanti & Remplacement gratuit." 
+                      : "Discutez d'abord, payez après accord."}
                   </p>
                </div>
-               <button 
-                 onClick={() => onDiscuss && onDiscuss(provider)}
-                 disabled={isBusy}
-                 className="w-full bg-brand-orange text-white font-bold py-2.5 rounded-lg hover:bg-orange-600 transition flex items-center justify-center gap-2 shadow-sm"
-               >
-                 <MessageSquare size={16} /> Discuter / Demander dispo
-               </button>
+               
+               <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={() => onDiscuss && onDiscuss(provider, true)}
+                    disabled={isBusy}
+                    className="bg-brand-blue text-white font-black py-3 rounded-xl hover:bg-blue-700 transition flex items-center justify-center gap-1.5 shadow-sm uppercase tracking-widest text-[9px]"
+                  >
+                    <ClipboardList size={14} /> 
+                    Sur Devis
+                  </button>
+                  <button 
+                    onClick={() => onDiscuss && onDiscuss(provider, false)}
+                    disabled={isBusy}
+                    className="bg-brand-orange text-white font-black py-3 rounded-xl hover:bg-orange-600 transition flex items-center justify-center gap-1.5 shadow-sm uppercase tracking-widest text-[9px]"
+                  >
+                    <ArrowRight size={14} /> 
+                    Commander
+                  </button>
+               </div>
             </>
         )}
 

@@ -22,7 +22,8 @@ import {
   Mail,
   Loader2,
   ExternalLink,
-  Award
+  Award,
+  Lock
 } from 'lucide-react';
 import { 
   SERVICE_FEE_PERCENTAGE, 
@@ -38,7 +39,8 @@ import {
   InternshipType,
   UserProfile,
   ViewState,
-  UserRole 
+  UserRole,
+  PrivateInternshipData
 } from '../types';
 import { authService } from '../services/authService';
 
@@ -47,11 +49,17 @@ interface RecruiterSpaceProps {
   setView: (view: ViewState) => void;
   onLogin?: (user: UserProfile) => void;
   offers: InternshipOffer[];
+  allApplications?: InternshipApplication[];
+  privateInternshipData?: PrivateInternshipData[];
   onPostOffer: (offer: Omit<InternshipOffer, 'id' | 'postedAt' | 'status'>) => void;
   onSubscribe?: () => void;
+  onUpdateApplicationStatus?: (appId: string, status: ApplicationStatus) => void;
 }
 
-export const RecruiterSpace: React.FC<RecruiterSpaceProps> = ({ currentUser, setView, onLogin, offers, onPostOffer, onSubscribe }) => {
+export const RecruiterSpace: React.FC<RecruiterSpaceProps> = ({ 
+  currentUser, setView, onLogin, offers, allApplications = [], privateInternshipData = [], 
+  onPostOffer, onSubscribe, onUpdateApplicationStatus 
+}) => {
   const [mode, setMode] = useState<'landing' | 'registration' | 'post_form' | 'matching_result' | 'dashboard'>(
     currentUser?.role === UserRole.COMPANY ? 'dashboard' : 'landing'
   );
@@ -78,30 +86,6 @@ export const RecruiterSpace: React.FC<RecruiterSpaceProps> = ({ currentUser, set
 
   // Registration State
 
-  const [applications, setApplications] = useState<InternshipApplication[]>([
-    {
-      id: 'app_1',
-      offerId: 'off_1',
-      studentId: 'std_1',
-      studentName: 'Koffi Kouassi',
-      studentLocation: 'Angré, Cocody',
-      studentSkills: ['React', 'JavaScript'],
-      status: ApplicationStatus.TO_CONTACT,
-      appliedAt: new Date().toISOString(),
-      isPremium: true
-    },
-    {
-      id: 'app_2',
-      offerId: 'off_1',
-      studentId: 'std_2',
-      studentName: 'Awa Koné',
-      studentLocation: 'Yopougon',
-      studentSkills: ['UI Design', 'Figma'],
-      status: ApplicationStatus.TO_CONTACT,
-      appliedAt: new Date().toISOString(),
-      isPremium: false
-    }
-  ]);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -138,6 +122,14 @@ export const RecruiterSpace: React.FC<RecruiterSpaceProps> = ({ currentUser, set
 
     const newUser: UserProfile = {
       id: `comp_${Date.now()}`,
+      roles: {
+        isClient: false,
+        isProvider: false,
+        isStudent: false,
+        isDelivery: false,
+        isLandlord: false,
+      },
+      activeRole: 'COMPANY',
       role: UserRole.COMPANY,
       firstName: regData.companyName,
       lastName: '',
@@ -160,6 +152,27 @@ export const RecruiterSpace: React.FC<RecruiterSpaceProps> = ({ currentUser, set
     } else {
       setError(res.message || "Erreur lors de l'inscription.");
     }
+  };
+
+  // Map InternshipRequests from props to InternshipApplications format if needed
+  // For simulation, we'll use allApplications prop
+  const applications = allApplications;
+
+  const handleValidateApplication = (app: InternshipApplication) => {
+    // 1. Update status via prop
+    if (onUpdateApplicationStatus) {
+      onUpdateApplicationStatus(app.id, ApplicationStatus.HIRED);
+    }
+
+    // 2. Simulate automated message
+    const companyName = currentUser?.firstName || "l'entreprise partenaire";
+    const date = new Date();
+    date.setDate(date.getDate() + 7); // Schedule for next week
+    const formattedDate = date.toLocaleDateString();
+    
+    const message = `Bonjour ${app.studentName}, votre demande de stage pour le poste de ${app.offerTitle || 'Stagiaire'} a été validée. Vous commencez le ${formattedDate} à 08:30 chez ${companyName}. Soyez bien vêtu. L'équipe APNET vous remercie pour votre confiance.`;
+    
+    alert(`Candidature validée ! Message envoyé au candidat :\n\n"${message}"`);
   };
 
   const KanbanColumn = ({ title, status, color }: { title: string, status: ApplicationStatus, color: string }) => (
@@ -197,13 +210,40 @@ export const RecruiterSpace: React.FC<RecruiterSpaceProps> = ({ currentUser, set
               ))}
             </div>
             
+            {app.status === ApplicationStatus.INTERVIEW && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleValidateApplication(app);
+                }}
+                className="w-full py-2 mb-2 bg-brand-green text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-2 hover:bg-green-700 transition-all shadow-lg shadow-green-200"
+              >
+                <CheckCircle2 size={12} /> Valider la Candidature
+              </button>
+            )}
+
             {app.isPremium ? (
-               <button 
-                 onClick={() => alert(`Ce candidat est PREMIUM. Frais de déblocage : ${PREMIUM_CANDIDATE_UNLOCK_FEE} F`)}
-                 className="w-full py-2 bg-brand-orange/10 text-brand-orange rounded-xl text-[10px] font-black flex items-center justify-center gap-2 hover:bg-brand-orange hover:text-white transition-all"
-               >
-                 <Zap size={12} /> Débloquer Profil Premium ({PREMIUM_CANDIDATE_UNLOCK_FEE}F)
-               </button>
+               <div className="space-y-2">
+                 <button 
+                   onClick={() => alert(`Ce candidat est PREMIUM. Frais de déblocage : ${PREMIUM_CANDIDATE_UNLOCK_FEE} F`)}
+                   className="w-full py-2 bg-brand-orange/10 text-brand-orange rounded-xl text-[10px] font-black flex items-center justify-center gap-2 hover:bg-brand-orange hover:text-white transition-all shadow-sm"
+                 >
+                   <Zap size={12} /> Débloquer Profil Premium
+                 </button>
+                 
+                 {(app.status === ApplicationStatus.INTERVIEW || app.status === ApplicationStatus.HIRED) && (
+                    <button 
+                      onClick={() => {
+                        const privateData = privateInternshipData.find(pd => pd.requestId === app.id);
+                        if (privateData) alert(`LETTRE DE MOTIVATION IA (PROPRIÉTÉ APNET) :\n\n${privateData.aiCoverLetter}`);
+                        else alert("Aucune lettre IA n'a été générée pour ce candidat.");
+                      }}
+                      className="w-full py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black flex items-center justify-center gap-2 hover:bg-blue-700 transition-all border border-blue-400"
+                    >
+                      <Lock size={12} /> Voir Lettre IA
+                    </button>
+                 )}
+               </div>
             ) : (
               <a 
                 href={`https://wa.me/${app.studentId}?text=Bonjour ${app.studentName}, nous avons vu votre candidature sur APNET...`}

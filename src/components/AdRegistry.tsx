@@ -336,6 +336,9 @@ export const AdCarousel: React.FC<AdCarouselProps> = ({ ads, zone, slotId, onInt
                 alt={currentAd.title} 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.src = `https://picsum.photos/seed/${currentAd.id}/800/600`;
+                }}
               />
             </div>
             <div className="flex-1">
@@ -376,37 +379,79 @@ export const AdCarousel: React.FC<AdCarouselProps> = ({ ads, zone, slotId, onInt
 
 export const CertifiedCompanies: React.FC = () => {
   const companies = [
-    { name: "Orange CI", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Orange_logo.svg/1024px-Orange_logo.svg.png" },
-    { name: "MTN", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/MTN_Logo.svg/1200px-MTN_Logo.svg.png" },
-    { name: "CIE", logo: "https://www.cie.ci/images/logo_cie.png" },
-    { name: "SODECI", logo: "https://www.sodeci.ci/images/logo_sodeci.png" },
-    { name: "Wave", logo: "https://www.wave.com/static/wave-logo-blue-500-2e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e.png" },
-    { name: "Brassivoire", logo: "https://brassivoire.ci/wp-content/uploads/2017/01/logo-brassivoire.png" }
+    { 
+      name: "Orange CI", 
+      color: "bg-orange-500",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Orange_logo.svg/1000px-Orange_logo.svg.png"
+    },
+    { 
+      name: "MTN", 
+      color: "bg-yellow-400",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/MTN_Logo.svg/1000px-MTN_Logo.svg.png"
+    },
+    { 
+      name: "CIE", 
+      color: "bg-blue-600",
+      logo: "https://cie.ci/themes/custom/cie/logo.png"
+    },
+    { 
+      name: "SODECI", 
+      color: "bg-blue-400",
+      logo: "https://sodeci.ci/themes/custom/sodeci/logo.png"
+    },
+    { 
+      name: "Wave", 
+      color: "bg-blue-500",
+      logo: "https://www.wave.com/static/brand/color-logo.png"
+    },
+    { 
+      name: "Brassivoire", 
+      color: "bg-red-600",
+      logo: "https://www.brassivoire.ci/sites/all/themes/brassivoire/logo.png"
+    }
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12 border-t border-gray-100">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-        <div className="max-w-xs text-center md:text-left">
-          <div className="flex items-center gap-2 text-brand-green font-black uppercase text-xs tracking-widest mb-2">
-            <ShieldCheck size={16} /> Entreprises Certifiées
+    <div className="max-w-7xl mx-auto px-4 py-20 border-t border-gray-100 bg-white">
+      <div className="flex flex-col items-center text-center mb-12">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-green/10 text-brand-green rounded-full text-xs font-black uppercase tracking-widest mb-4">
+          <ShieldCheck size={16} /> Partenaires de Confiance
+        </div>
+        <h3 className="text-3xl md:text-4xl font-black text-gray-900 leading-tight max-w-2xl">
+          Ils recrutent leurs stagiaires et <span className="text-brand-orange">artisans certifiés</span> sur APNET.
+        </h3>
+      </div>
+      
+      <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
+        {companies.map((c, i) => (
+          <div 
+            key={i} 
+            className="flex flex-col items-center gap-3 transition-all cursor-pointer group"
+            title={c.name}
+          >
+            <div className="relative w-20 h-20 md:w-24 md:h-24 flex items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-gray-100 group-hover:border-brand-orange group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-300">
+              <img 
+                 src={c.logo} 
+                 alt={c.name} 
+                 className="max-w-full max-h-full object-contain filter grayscale group-hover:grayscale-0 transition-all duration-500"
+                 referrerPolicy="no-referrer"
+                 onError={(e) => {
+                   e.currentTarget.style.display = 'none';
+                   const parent = e.currentTarget.parentElement;
+                   if (parent && !parent.querySelector('.fallback-div')) {
+                      const fallback = document.createElement('div');
+                      fallback.className = `fallback-div w-full h-full rounded-xl ${c.color} flex items-center justify-center text-white font-black text-xs shadow-sm`;
+                      fallback.innerText = c.name.substring(0, 2).toUpperCase();
+                      parent.appendChild(fallback);
+                   }
+                 }}
+              />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 group-hover:text-gray-900 transition-colors uppercase tracking-[0.2em]">
+              {c.name}
+            </span>
           </div>
-          <h3 className="text-xl font-black text-gray-900 leading-tight">
-            Ils recrutent leurs stagiaires sur APNET.
-          </h3>
-        </div>
-        
-        <div className="flex-1 flex flex-wrap justify-center md:justify-end items-center gap-8 md:gap-12 opacity-50 grayscale hover:grayscale-0 transition-all">
-          {companies.map((c, i) => (
-            <img 
-              key={i} 
-              src={c.logo} 
-              alt={c.name} 
-              className="h-8 md:h-10 w-auto object-contain hover:scale-110 transition-transform cursor-pointer"
-              title={c.name}
-            />
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   );

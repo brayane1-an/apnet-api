@@ -116,8 +116,8 @@ export const calculateDeliveryPrice = (
   if (vehicleType === VehicleType.VOITURE) vehicleMultiplier = 2.5;
   if (vehicleType === VehicleType.CAMIONNETTE) vehicleMultiplier = 7.0; // Augmenté
   if (vehicleType === VehicleType.TRICYCLE) vehicleMultiplier = 1.5;
-  if (vehicleType === VehicleType.CARGO) vehicleMultiplier = 15.0; // Réalité marché
-  if (vehicleType === VehicleType.CAMION) vehicleMultiplier = 15.0; // Réalité marché
+  if (vehicleType === VehicleType.CARGO) vehicleMultiplier = 10.0; // Réalité marché (corrigé)
+  if (vehicleType === VehicleType.CAMION) vehicleMultiplier = 10.0; // Réalité marché (corrigé)
 
   let riderPrice = Math.round(basePrice * vehicleMultiplier);
   
@@ -149,9 +149,9 @@ export const calculateDeliveryPrice = (
   // 5. Option Objet Précieux (Manutention & Assurance)
   let riskPremium = 0;
   if (declaredValue > 0) {
-      // Frais fixes de manutention selon le poids + 5% de la valeur
+      // Frais fixes de manutention selon le poids + 10% de la valeur
       const handlingFee = weightKg > 10 ? 1000 : 500;
-      riskPremium = handlingFee + Math.round(declaredValue * 0.05);
+      riskPremium = handlingFee + Math.round(declaredValue * 0.10);
       riderPrice += riskPremium;
       supplements.push(`Objet Précieux / Assurance (+${riskPremium}F)`);
   }
@@ -164,19 +164,28 @@ export const calculateDeliveryPrice = (
   }
 
   // 6. Commission & Frais APNET
-  // Stratégie : 100F de frais de service fixes pour le client (Frais de dossier)
-  // Commission de 10% prélevée sur le livreur pour TOUS sauf MOTO (0%)
+  // Stratégie : 100F de frais de service fixes pour le client (Frais de dossier) sur MOTO uniquement
+  // Commission de 10% prélevée sur le livreur, sauf TRICYCLE (5%) et MOTO (0%)
   const isMoto = vehicleType === VehicleType.MOTO;
   
   let commission = 0;
-  if (!isMoto) {
-      commission = Math.round(riderPrice * 0.10); // 10% commission
-      supplements.push(`Commission APNET 10% (${commission}F)`);
+  let promoLabel: string | null = null;
+
+  if (isMoto) {
+    commission = 0;
+    promoLabel = '🏍️ Sans commission — 100F seulement';
+    supplements.push("Commission Livreur 0% (Spécial Moto)");
+  } else if (vehicleType === VehicleType.TRICYCLE) {
+    commission = Math.round(riderPrice * 0.05);
+    promoLabel = '✅ Tarif réduit 5%';
+    supplements.push(`Commission APNET 5% (Tricycle: ${commission}F)`);
   } else {
-      supplements.push("Commission Livreur 0% (Spécial Moto)");
+    commission = Math.round(riderPrice * 0.10);
+    promoLabel = null;
+    supplements.push(`Commission APNET 10% (${commission}F)`);
   }
   
-  const serviceFee = 100; // Frais de dossier fixes payés par le client
+  const serviceFee = isMoto ? 100 : 0; 
   const finalPrice = riderPrice + serviceFee;
   const finalRiderGain = riderPrice - commission;
   const totalApnetGain = commission + serviceFee;
@@ -188,6 +197,7 @@ export const calculateDeliveryPrice = (
     apnet_fixed_fee: serviceFee,
     apnet_commission: commission,
     hasLoadingService,
+    promoLabel,
     details: {
       zone: zoneName,
       distance: `${distanceKm} km`,

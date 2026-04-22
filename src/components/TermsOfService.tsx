@@ -176,6 +176,25 @@ export const TermsOfService = () => {
           </div>
         </section>
 
+        <section>
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2 mb-4">
+            <span className="bg-brand-orange text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">11</span>
+            Consentement et Visibilité des Données
+          </h2>
+          <p className="mb-4">
+            Sur APNET, la protection de la vie privée et le contrôle des informations personnelles sont au cœur de notre modèle.
+          </p>
+          <div className="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
+            <p className="font-semibold text-green-800 flex items-center gap-2">
+              <Shield size={18} /> Principe de Consentement
+            </p>
+            <p className="text-sm text-green-700 mt-1">
+              Les prestataires choisissent librement et explicitement quelles informations rendre publiques sur leur profil (ex: photo, langues parlées, années d'expérience, ou informations physiques comme la taille). 
+              C'est le consentement de l'utilisateur qui régit la visibilité de ces données pour les tiers. Tout utilisateur peut modifier ses paramètres de visibilité à tout moment depuis son espace profil.
+            </p>
+          </div>
+        </section>
+
         <section className="border-t pt-8 mt-12">
           <h2 className="text-xl font-bold text-gray-900 mb-2">Acceptation</h2>
           <p className="text-gray-600 text-sm">

@@ -128,9 +128,16 @@ export const MOCK_ADS: Advertisement[] = [
   }
 ];
 // ... rest of the file remains unchanged ...
-import { UserProfile, UserRole, JobOffer, JobType, JobUrgency, Advertisement, RealEstateListing, PropertyType, RiderLevel, ProFeedback, ClientReview, InternshipRequest, InternshipType, InternshipStatus, DeliveryOrder, VehicleType, InternshipOffer, CompletedWork } from './types';
+import { UserProfile, UserRole, JobOffer, JobType, JobUrgency, Advertisement, RealEstateListing, PropertyType, RiderLevel, ProFeedback, ClientReview, InternshipRequest, InternshipType, InternshipStatus, DeliveryOrder, VehicleType, InternshipOffer, CompletedWork, LandlordServiceLevel } from './types';
 
-export const SERVICE_FEE_PERCENTAGE = 0.02; // 2% fee on standard transactions
+export const RENT_UNLOCK_FEE = 3000;
+export const SALE_UNLOCK_FEE = 5000;
+export const ROOM_UNLOCK_FEE = 2000;
+export const RESIDENCE_COMMISSION = 0.08;
+export const VILLA_WEEKEND_COMMISSION = 0.10;
+export const RENT_SIGNING_COMMISSION = 0.05;
+export const SALE_SIGNING_COMMISSION = 0.02;
+export const SERVICE_FEE_PERCENTAGE = 0.02; // Global platform fee
 export const PLATFORM_MAINTENANCE_FEE = 50; // 50 FCFA flat fee for server/support on EVERY transaction
 
 export const MOCK_COMPLETED_WORKS: CompletedWork[] = [
@@ -150,13 +157,44 @@ export const PRO_CERTIFICATION_MONTHLY = 5000; // Monthly sub for "Badge de Conf
 export const AD_SLOT_DAILY_RATE = 1000; // Base rate for internal ads
 
 // --- REAL ESTATE FEES & TEXTS ---
-export const RENTAL_VISIT_FEE = 3000; // Fee to unlock rental contact
-export const ROOM_VISIT_FEE = 2000;   // Fee to unlock ROOM contact (NEW)
-export const HOUSE_VISIT_FEE = 3000;  // Alias if needed
 export const EVICTION_INTERVENTION_FEE = 10000; // Fee mentioned in owner notification
-export const RESIDENCE_COMMISSION_PERCENTAGE = 0.10; // 10% commission on residences
 
-export const INTERNSHIP_SERVICE_FEE = 5000; // Fee paid ONLY when internship is found
+export const INTERNSHIP_SERVICE_FEE = 5000; // Fee paid UPFRONT for internship search
+
+export const CATEGORY_EXAMPLES: Record<string, { image: string, description: string }> = {
+  'Bâtiment & Artisanat': {
+    image: 'https://images.unsplash.com/photo-1541888946425-d81bb19480c5?auto=format&fit=crop&w=1000&q=80',
+    description: 'Chantier de rénovation complète d\'une villa. Pose de briques, électricité et peinture.'
+  },
+  'Commerce & Vente': {
+    image: 'https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?auto=format&fit=crop&w=1000&q=80',
+    description: 'Gestion de stock et vente assistée dans une boutique de prêt-à-porter moderne.'
+  },
+  'Restauration & Hôtellerie': {
+    image: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=1000&q=80',
+    description: 'Service de traiteur pour un mariage de 100 personnes. Dressage et service à table.'
+  },
+  'Transport & Logistique': {
+    image: 'https://images.unsplash.com/photo-1580674285054-bed31e145f59?auto=format&fit=crop&w=1000&q=80',
+    description: 'Livraison express de plis confidentiels et colis fragiles à travers le Plateau.'
+  },
+  'Santé & Bien-être': {
+    image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1000&q=80',
+    description: 'Séance de massage relaxant à domicile ou soin capillaire professionnel.'
+  },
+  'Éducation & Formation': {
+    image: 'https://images.unsplash.com/photo-1524178232363-1fb28f74b573?auto=format&fit=crop&w=1000&q=80',
+    description: 'Soutien scolaire intensif en mathématiques pour la préparation du Bac.'
+  },
+  'Technologie & Informatique': {
+    image: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1000&q=80',
+    description: 'Développement d\'une application mobile de gestion de stock pour PME.'
+  },
+  'Services à domicile': {
+    image: 'https://images.unsplash.com/photo-1581578731522-aa02d8d80c3e?auto=format&fit=crop&w=1000&q=80',
+    description: 'Entretien ménager complet d\'un appartement T3. Repassage et rangement inclus.'
+  }
+};
 
 export const TENANT_ENGAGEMENT_TEXT = `
 Engagement locataire
@@ -409,6 +447,8 @@ export const MOCK_PROVIDERS: UserProfile[] = [
   // ADMIN ACCOUNT
   {
     id: 'admin_001',
+    roles: { isClient: true, isProvider: true, isStudent: false, isDelivery: false, isLandlord: false },
+    activeRole: 'ADMIN',
     role: UserRole.ADMIN,
     firstName: 'Super',
     lastName: 'Admin',
@@ -426,6 +466,8 @@ export const MOCK_PROVIDERS: UserProfile[] = [
   // ... (Jean, Awa, Moussa, Sophie, Ibrahim - keep as is) ...
   {
     id: '1',
+    roles: { isClient: false, isProvider: true, isStudent: false, isDelivery: false, isLandlord: false },
+    activeRole: 'PROVIDER',
     role: UserRole.PROVIDER,
     firstName: 'Jean',
     lastName: 'Kouassi',
@@ -467,6 +509,8 @@ export const MOCK_PROVIDERS: UserProfile[] = [
   },
   {
     id: '2',
+    roles: { isClient: false, isProvider: true, isStudent: false, isDelivery: false, isLandlord: false },
+    activeRole: 'PROVIDER',
     role: UserRole.PROVIDER,
     firstName: 'Awa',
     lastName: 'Touré',
@@ -507,6 +551,8 @@ export const MOCK_PROVIDERS: UserProfile[] = [
   },
   {
     id: '3',
+    roles: { isClient: false, isProvider: true, isStudent: false, isDelivery: false, isLandlord: false },
+    activeRole: 'PROVIDER',
     role: UserRole.PROVIDER,
     firstName: 'Moussa',
     lastName: 'Koné',
@@ -536,6 +582,8 @@ export const MOCK_PROVIDERS: UserProfile[] = [
   },
   {
     id: '4',
+    roles: { isClient: false, isProvider: true, isStudent: false, isDelivery: false, isLandlord: false },
+    activeRole: 'PROVIDER',
     role: UserRole.PROVIDER,
     firstName: 'Sophie',
     lastName: 'Akissi',
@@ -565,6 +613,8 @@ export const MOCK_PROVIDERS: UserProfile[] = [
   },
   {
     id: '5',
+    roles: { isClient: false, isProvider: true, isStudent: false, isDelivery: false, isLandlord: false },
+    activeRole: 'PROVIDER',
     role: UserRole.PROVIDER,
     firstName: 'Ibrahim',
     lastName: 'Sow',
@@ -672,7 +722,7 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
       pool: false,
       wifi: true
     },
-    photos: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'],
+    photos: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1000&q=80'],
     availability: ['Disponible'],
     rating: 4.8,
     reviews: [
@@ -705,7 +755,7 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
       pool: true,
       wifi: true
     },
-    photos: ['https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'],
+    photos: ['https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1000&q=80'],
     availability: ['Week-end'],
     rating: 4.9,
     reviews: [],
@@ -729,7 +779,7 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
       pool: false,
       wifi: false
     },
-    photos: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'],
+    photos: ['https://images.unsplash.com/photo-1536376074432-8d2a3ff0ef82?auto=format&fit=crop&w=1000&q=80'],
     availability: ['Immédiat'],
     rating: 4.0,
     reviews: [],
@@ -753,7 +803,8 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
       pool: false,
       wifi: false
     },
-    photos: ['https://images.unsplash.com/photo-1598928636135-d146006ff4be?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'],
+    photos: ['https://images.unsplash.com/photo-1555854811-0e768652077c?auto=format&fit=crop&w=1000&q=80'],
+    landlordServiceLevel: LandlordServiceLevel.SECURE,
     availability: ['Disponible'],
     rating: 0,
     reviews: [],
@@ -777,7 +828,8 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
       pool: false,
       wifi: true
     },
-    photos: ['https://images.unsplash.com/photo-1522771753035-0a1539503ed2?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'],
+    photos: ['https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=1000&q=80'],
+    landlordServiceLevel: LandlordServiceLevel.PREMIUM,
     availability: ['Disponible'],
     rating: 0,
     reviews: [],
@@ -801,7 +853,7 @@ export const MOCK_REAL_ESTATE_LISTINGS: RealEstateListing[] = [
       pool: false,
       wifi: false
     },
-    photos: ['https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'],
+    photos: ['https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1000&q=80'],
     availability: ['Indisponible'], // Marqué indisponible
     rating: 0,
     reviews: []

@@ -163,6 +163,51 @@ export const analyzeJobImage = async (
   }
 };
 
+export interface ExtractedCriteria {
+  jobTitle?: string;
+  category?: string;
+  skills?: string[];
+  location?: string;
+  urgency?: string;
+  budget?: string;
+  languages?: string[];
+}
+
+export const extractSearchCriteria = async (query: string): Promise<ExtractedCriteria> => {
+  try {
+    const ai = getAiClient();
+    const model = 'gemini-2.0-flash'; // Use 2.0-flash for faster extraction
+    const prompt = `
+      Tu es un expert en analyse de besoins de services pour APNET Côte d'Ivoire.
+      L'utilisateur a écrit son besoin : "${query}"
+      
+      Extrais les critères de recherche au format JSON pour interroger une base de données de prestataires.
+      
+      Champs attendus :
+      - jobTitle : Le métier principal recherché (ex: Plombier, Nounou, Maçon)
+      - category : La catégorie large (ex: Bâtiment, Service à la personne)
+      - skills : Liste de compétences techniques extraites (ex: ["carrelage", "plâtre"])
+      - location : Ville ou quartier mentionné (ex: "Abidjan", "Cocody")
+      - urgency : Niveau d'urgence ("URGENT" ou "STANDARD")
+      - budget : Fourchette de prix mentionnée (string)
+      - languages : Langues souhaitées mentionnées (ex: ["Français", "Baoulé"])
+
+      Réponds UNIQUEMENT en JSON.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: prompt,
+      config: { responseMimeType: "application/json" }
+    });
+
+    return JSON.parse(response.text || "{}") as ExtractedCriteria;
+  } catch (error) {
+    console.error("Error extracting criteria:", error);
+    return {};
+  }
+};
+
 // --- VALIDATION DES DOCUMENTS D'INSCRIPTION ---
 
 export async function validateIdentityCard(file: File): Promise<{ valid: boolean, reason?: string }> {

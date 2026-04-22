@@ -3,17 +3,29 @@ import React, { useState, useEffect } from 'react';
 import { calculateDeliveryPrice } from '../services/deliveryService';
 import { DeliveryQuote, DeliveryOrder, VehicleType, UserProfile } from '../types';
 import { ABIDJAN_COMMUNES, ABIDJAN_DISTANCES } from '../constants';
-import { Calculator, MapPin, Truck, Package, Clock, Info, CheckCircle, User, Phone, FileText, Loader2, ShieldCheck, Gem, Car, AlertTriangle } from 'lucide-react';
+import { Calculator, MapPin, Truck, Package, Clock, Info, CheckCircle, User, Phone, FileText, Loader2, ShieldCheck, Gem, Car, AlertTriangle, Lock, Upload } from 'lucide-react';
 
 interface DeliveryEstimatorProps {
+    step?: 'ESTIMATE' | 'DETAILS';
+    onStepChange?: (step: 'ESTIMATE' | 'DETAILS') => void;
     onOrder?: (orderData: Partial<DeliveryOrder>) => void;
     provider?: UserProfile | null;
     currentUser?: UserProfile | null;
     isBadWeather?: boolean;
 }
 
-export const DeliveryEstimator: React.FC<DeliveryEstimatorProps> = ({ onOrder, provider, currentUser, isBadWeather = false }) => {
-  const [step, setStep] = useState<'ESTIMATE' | 'DETAILS'>('ESTIMATE');
+export const DeliveryEstimator: React.FC<DeliveryEstimatorProps> = ({ 
+  step: controlledStep, 
+  onStepChange, 
+  onOrder, 
+  provider, 
+  currentUser, 
+  isBadWeather = false 
+}) => {
+  const [internalStep, setInternalStep] = useState<'ESTIMATE' | 'DETAILS'>('ESTIMATE');
+  const step = controlledStep || internalStep;
+  const setStep = onStepChange || setInternalStep;
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Estimate State
@@ -36,9 +48,24 @@ export const DeliveryEstimator: React.FC<DeliveryEstimatorProps> = ({ onOrder, p
   const [description, setDescription] = useState('');
   const [senderPhone, setSenderPhone] = useState('');
   const [receiverPhone, setReceiverPhone] = useState('');
+  const [packageContent, setPackageContent] = useState('');
+  const [legalComplianceAccepted, setLegalComplianceAccepted] = useState(false);
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
 
   // Validation State
-  const isFormValid = pickupAddress.length > 3 && dropoffAddress.length > 3 && senderPhone.length >= 8 && receiverPhone.length >= 8;
+  const valNum = isPrecious === 'oui' ? (parseInt(declaredValue) || 0) : 0;
+  const isValueExceeded = valNum > 200000;
+  const needsInvoice = valNum > 50000;
+  const isInvoiceProvided = !needsInvoice || invoiceFile !== null;
+
+  const isFormValid = pickupAddress.length > 3 && 
+                     dropoffAddress.length > 3 && 
+                     senderPhone.length >= 8 && 
+                     receiverPhone.length >= 8 && 
+                     packageContent.length > 3 &&
+                     legalComplianceAccepted &&
+                     !isValueExceeded && 
+                     isInvoiceProvided;
 
   useEffect(() => {
     // Calcul automatique de la distance entre les communes
@@ -86,6 +113,8 @@ export const DeliveryEstimator: React.FC<DeliveryEstimatorProps> = ({ onOrder, p
               clientPhone: currentUser?.phone,
               senderPhone,
               receiverPhone,
+              packageContent,
+              legalComplianceAccepted,
               isPrecious: isPrecious === 'oui',
               declaredValue: val,
               maxRefund: isPrecious === 'oui' ? val * 0.5 : 0,
@@ -103,7 +132,7 @@ export const DeliveryEstimator: React.FC<DeliveryEstimatorProps> = ({ onOrder, p
       <div className="text-center mb-8">
         <h1 className="text-3xl font-extrabold text-gray-900 flex items-center justify-center gap-3">
           <Truck className="text-brand-orange" size={32} />
-          {step === 'ESTIMATE' ? 'Réserver un Livreur Privé' : 'Finaliser la Réservation'}
+          {step === 'ESTIMATE' ? 'Passer une course' : 'Finaliser la commande'}
         </h1>
         {provider && (
             <div className="mt-4 inline-flex items-center gap-3 bg-brand-orange/10 px-4 py-2 rounded-full border border-brand-orange/20">
@@ -223,12 +252,40 @@ export const DeliveryEstimator: React.FC<DeliveryEstimatorProps> = ({ onOrder, p
                             value={declaredValue}
                             onChange={(e) => setDeclaredValue(e.target.value)}
                             placeholder="Ex: 50000"
-                            className="w-full p-2 border border-indigo-300 rounded-lg mb-2"
+                            className={`w-full p-2 border rounded-lg mb-2 ${isValueExceeded ? 'border-red-500 bg-red-50' : 'border-indigo-300'}`}
                          />
-                         {declaredValue && parseInt(declaredValue) > 0 && (
+                         
+                         {isValueExceeded && (
+                            <div className="flex items-center gap-2 text-red-600 text-[10px] font-bold mb-3 animate-pulse">
+                               <Lock size={12} /> Pour assurer un colis de plus de 200 000 FCFA, veuillez contacter le support APNET.
+                            </div>
+                         )}
+
+                         {needsInvoice && (
+                            <div className="mb-4 p-3 bg-white border border-indigo-200 rounded-xl space-y-2 animate-in fade-in zoom-in-95">
+                               <label className="block text-[10px] font-black text-indigo-900 uppercase flex items-center gap-1">
+                                  <Upload size={10} /> Joindre la facture ou le reçu d'achat (Obligatoire {'>'} 50 000F)
+                               </label>
+                               <div className="relative">
+                                  <input 
+                                     type="file" 
+                                     className="absolute inset-0 opacity-0 cursor-pointer z-10" 
+                                     onChange={(e) => setInvoiceFile(e.target.files?.[0] || null)}
+                                     accept="image/*,.pdf"
+                                  />
+                                  <div className="p-3 border-2 border-dashed border-indigo-100 rounded-lg text-center bg-indigo-50/30 group-hover:bg-indigo-50 transition">
+                                     <p className="text-[10px] text-indigo-600 font-bold">
+                                        {invoiceFile ? invoiceFile.name : "Sélectionner la facture"}
+                                     </p>
+                                  </div>
+                                </div>
+                            </div>
+                         )}
+
+                         {declaredValue && parseInt(declaredValue) > 0 && !isValueExceeded && (
                              <div className="bg-white p-2 rounded border border-indigo-100">
                                  <p className="text-xs text-indigo-800 flex items-center gap-1 mb-1">
-                                    <ShieldCheck size={12} /> Prime Risque : +{Math.round(parseInt(declaredValue) * 0.05).toLocaleString()} F
+                                    <ShieldCheck size={12} /> Prime Risque : +{Math.round(parseInt(declaredValue) * 0.10).toLocaleString()} F
                                  </p>
                                  <p className="text-[10px] text-indigo-600 leading-tight">
                                     En cas de problème validé, remboursement jusqu'à <strong>{(parseInt(declaredValue) * 0.5).toLocaleString()} FCFA</strong>.
@@ -312,14 +369,44 @@ export const DeliveryEstimator: React.FC<DeliveryEstimatorProps> = ({ onOrder, p
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nature du colis</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Contenu exact du colis (Soyez précis) <span className="text-red-500">*</span></label>
+                    <textarea 
+                        rows={3}
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-orange focus:border-transparent bg-yellow-50/20 font-medium"
+                        placeholder="Ex: 2 ordinateurs portables HP, 1 sac de vêtements..."
+                        value={packageContent}
+                        onChange={e => setPackageContent(e.target.value)}
+                        required
+                    />
+                    <p className="text-[10px] text-gray-500 mt-1 italic leading-tight">Cette déclaration est obligatoire. En cas de non-concordance, le livreur refusera le colis.</p>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Indications particulières (Optionnel)</label>
                     <textarea 
                         rows={2}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-orange focus:border-transparent"
-                        placeholder="Ex: Documents importants, fragile, liquide..."
+                        placeholder="Ex: Très fragile, ne pas empiler, remettre en main propre..."
                         value={description}
                         onChange={e => setDescription(e.target.value)}
                     />
+                </div>
+
+                <div className="pt-4 border-t border-gray-100 bg-gray-50/50 p-3 rounded-xl border border-dashed border-gray-200">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                        <div className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${legalComplianceAccepted ? 'bg-brand-orange border-brand-orange' : 'bg-white border-gray-400 group-hover:border-brand-orange text-transparent'}`}>
+                            <input 
+                                type="checkbox" 
+                                className="hidden" 
+                                checked={legalComplianceAccepted}
+                                onChange={(e) => setLegalComplianceAccepted(e.target.checked)}
+                            />
+                            {legalComplianceAccepted && <CheckCircle size={14} className="text-white fill-current" />}
+                        </div>
+                        <span className="text-[11px] text-gray-700 leading-normal font-medium">
+                            Je certifie sur l'honneur que ce colis ne contient aucun produit illicite (drogues, armes, etc.). J'accepte que le livreur puisse demander à inspecter le colis avant la prise en charge. <span className="text-red-600 font-bold">*</span>
+                        </span>
+                    </label>
                 </div>
             </div>
           )}
@@ -386,7 +473,7 @@ export const DeliveryEstimator: React.FC<DeliveryEstimatorProps> = ({ onOrder, p
                        <p><strong>B (Base) :</strong> Tarif zone x Distance (Auto-calculée)</p>
                        <p><strong>T (Trafic) :</strong> 1.15 si heure de pointe (7h-9h / 17h-19h)</p>
                        <p><strong>V (Véhicule) :</strong> Multiplicateur selon l'engin</p>
-                       <p><strong>P (Précieux) :</strong> Manutention + 5% valeur déclarée</p>
+                       <p><strong>P (Précieux) :</strong> Manutention + 10% valeur déclarée</p>
                        <p><strong>M (Main d'œuvre) :</strong> +2000F ou +5000F (si coché)</p>
                        <p><strong>S (Service) :</strong> 100 FCFA (Frais fixes dossier)</p>
                        <p className="mt-2 pt-1 border-t border-orange-100 text-orange-900 font-bold italic">Gain Livreur = (PRIX TOTAL - S) - 10% (sauf Moto)</p>
@@ -414,7 +501,7 @@ export const DeliveryEstimator: React.FC<DeliveryEstimatorProps> = ({ onOrder, p
                 onClick={handleNext}
                 className="bg-brand-green text-white font-bold py-3 px-8 rounded-full shadow-lg hover:bg-green-700 transition transform active:scale-95"
             >
-                Commander un Coursier
+                Confirmer l'estimation
             </button>
         ) : (
             <button 
@@ -433,6 +520,13 @@ export const DeliveryEstimator: React.FC<DeliveryEstimatorProps> = ({ onOrder, p
                 )}
             </button>
         )}
+      </div>
+
+      <div className="mt-8 bg-gray-100 p-4 rounded-xl border border-gray-200 text-center">
+         <p className="text-xs text-gray-500 font-medium">
+            <Lock size={12} className="inline mr-1" />
+            Note Légale : APNET s'engage à rembourser 50% de la valeur déclarée en cas de perte, sous réserve de la validation de la facture d'achat par nos services.
+         </p>
       </div>
     </div>
   );

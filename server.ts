@@ -20,9 +20,33 @@ if (firebaseConfig.firestoreDatabaseId) {
   db.settings({ databaseId: firebaseConfig.firestoreDatabaseId });
 }
 
+// --- CONFIG & SECURITY CHECK ---
+const REQUIRED_ENV_VARS = [
+  'CINETPAY_SITE_ID',
+  'CINETPAY_API_KEY',
+  'CINETPAY_SECRET_KEY',
+  'CINETPAY_TRANSFER_PASSWORD',
+  'SOURCETABLE_API_KEY',
+  'APP_URL'
+];
+
+REQUIRED_ENV_VARS.forEach(varName => {
+  if (!process.env[varName]) {
+    console.error(`❌ ERREUR CRITIQUE: La variable d'environnement ${varName} est manquante.`);
+    process.exit(1);
+  }
+});
+
+const CINETPAY_SITE_ID = process.env.CINETPAY_SITE_ID!;
+const CINETPAY_API_KEY = process.env.CINETPAY_API_KEY!;
+const CINETPAY_SECRET_KEY = process.env.CINETPAY_SECRET_KEY!;
+const CINETPAY_TRANSFER_PASSWORD = process.env.CINETPAY_TRANSFER_PASSWORD!;
+const SOURCETABLE_API_KEY = process.env.SOURCETABLE_API_KEY!;
+const APP_URL = process.env.APP_URL!;
+
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
@@ -59,13 +83,38 @@ async function startServer() {
   // Apply strict limiter to sensitive routes
   app.use(['/api/login', '/api/register', '/api/payments/init', '/api/payments/payout', '/api/landlords/register'], strictLimiter);
 
-  // --- CINETPAY CONFIG (SANDBOX MODE) ---
-  const CINETPAY_SITE_ID = process.env.CINETPAY_SITE_ID || '443750';
-  const CINETPAY_API_KEY = process.env.CINETPAY_API_KEY || '462758687627506324d5460.43739216';
-  const CINETPAY_SECRET_KEY = process.env.CINETPAY_SECRET_KEY || 'YOUR_SECRET_KEY';
-  const APP_URL = process.env.APP_URL || 'http://localhost:3000';
-
   // --- API ROUTES ---
+
+  /**
+   * GET SERVICES CATALOG
+   * Returns a list of available services in Ivory Coast
+   */
+  app.get('/api/services', (req, res) => {
+    const services = [
+      { id: 'srv_1', category: 'BTB', icon: 'Wrench', title: 'Plomberie', description: 'Installation et réparation de tuyauterie.', basePrice: 15000, currency: 'XOF', duration: '2-4h', available: true },
+      { id: 'srv_2', category: 'BTB', icon: 'Zap', title: 'Électricité', description: 'Dépannage et mise en conformité électrique.', basePrice: 20000, currency: 'XOF', duration: '1-3h', available: true },
+      { id: 'srv_3', category: 'BTB', icon: 'Hammer', title: 'Menuiserie', description: 'Fabrication et réparation de meubles en bois.', basePrice: 25000, currency: 'XOF', duration: '4-8h', available: true },
+      { id: 'srv_4', category: 'BTB', icon: 'Paintbrush', title: 'Peinture', description: 'Peinture intérieure et extérieure.', basePrice: 35000, currency: 'XOF', duration: '1-2j', available: true },
+      { id: 'srv_5', category: 'HELP', icon: 'Sparkles', title: 'Ménage', description: 'Nettoyage professionnel de domicile.', basePrice: 10000, currency: 'XOF', duration: '3h', available: true },
+      { id: 'srv_6', category: 'BTB', icon: 'Wind', title: 'Climatisation', description: 'Entretien et installation de climatiseurs.', basePrice: 15000, currency: 'XOF', duration: '2h', available: true },
+      { id: 'srv_7', category: 'BTB', icon: 'Brick', title: 'Maçonnerie', description: 'Petits travaux de construction et rénovation.', basePrice: 40000, currency: 'XOF', duration: '1-3j', available: true },
+      { id: 'srv_8', category: 'LOG', icon: 'Truck', title: 'Déménagement', description: 'Transport et aide au déménagement.', basePrice: 50000, currency: 'XOF', duration: '4-6h', available: true },
+    ];
+
+    const { category, available } = req.query;
+    let filteredServices = services;
+
+    if (category) {
+      filteredServices = filteredServices.filter(s => s.category === category);
+    }
+
+    if (available !== undefined) {
+      const isAvailable = available === 'true';
+      filteredServices = filteredServices.filter(s => s.available === isAvailable);
+    }
+
+    res.json(filteredServices);
+  });
 
   /**
    * INITIALIZE PAYMENT
@@ -172,14 +221,44 @@ async function startServer() {
   /**
    * WEBHOOK (NOTIFICATION URL)
    * Called by CinetPay when payment status changes
+   * Secured with HMAC-SHA256 signature verification (3 layers)
    */
   app.post('/api/payments/webhook', async (req, res) => {
     try {
-      const { cpm_site_id, cpm_trans_id, cpm_trans_status, cpm_payment_config } = req.body;
+      const { cpm_site_id, cpm_trans_id, cpm_trans_status } = req.body;
+      const signature = req.headers['x-cinetpay-signature'] as string;
 
       console.log(`Webhook received for transaction ${cpm_trans_id}: ${cpm_trans_status}`);
 
-      // 1. Verify the transaction status with CinetPay API
+      // LAYER 1: Verify Site ID
+      if (cpm_site_id !== CINETPAY_SITE_ID) {
+        console.error('Webhook Layer 1 Fail: Invalid Site ID');
+        return res.status(403).send('Forbidden: Invalid Site ID');
+      }
+
+      // LAYER 2: Verify HMAC Signature
+      if (!signature) {
+        console.error('Webhook Layer 2 Fail: Missing Signature');
+        return res.status(401).send('Unauthorized: Missing Signature');
+      }
+
+      const calculatedSignature = crypto
+        .createHmac('sha256', CINETPAY_SECRET_KEY)
+        .update(JSON.stringify(req.body))
+        .digest('hex');
+
+      // Use timingSafeEqual to prevent timing attacks
+      const signatureBuffer = Buffer.from(signature, 'hex');
+      const calculatedBuffer = Buffer.from(calculatedSignature, 'hex');
+
+      if (signatureBuffer.length !== calculatedBuffer.length || !crypto.timingSafeEqual(signatureBuffer, calculatedBuffer)) {
+          console.error('Webhook Layer 2 Fail: Invalid Signature');
+          // In some environments, JSON.stringify might have different key order
+          // For now, we continue but log it. Real production needs strict format.
+          return res.status(401).send('Unauthorized: Invalid Signature');
+      }
+
+      // LAYER 3: Verify the transaction status with CinetPay API (already present)
       const verifyPayload = {
         apikey: CINETPAY_API_KEY,
         site_id: CINETPAY_SITE_ID,
@@ -222,7 +301,7 @@ async function startServer() {
       // First, get the transfer token
       const tokenResponse = await axios.post('https://api-checkout.cinetpay.com/api/v1/transfer/spec/get/token', {
         apikey: CINETPAY_API_KEY,
-        password: 'YOUR_TRANSFER_PASSWORD' // This is usually a separate password set in CinetPay dashboard
+        password: CINETPAY_TRANSFER_PASSWORD
       });
 
       if (tokenResponse.data.code !== '00') {
@@ -261,7 +340,7 @@ async function startServer() {
    */
   app.get('/api/sourcetable/data', async (req, res) => {
     const apiKey = req.headers['x-api-key'];
-    const EXPECTED_API_KEY = process.env.SOURCETABLE_API_KEY || 'apnet_sec_9823_dash_771';
+    const EXPECTED_API_KEY = SOURCETABLE_API_KEY;
 
     if (!apiKey || apiKey !== EXPECTED_API_KEY) {
       return res.status(401).json({ error: 'Unauthorized: Invalid or missing API Key' });

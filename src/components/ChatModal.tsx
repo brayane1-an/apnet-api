@@ -1,22 +1,54 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { UserProfile, ChatMessage } from '../types';
-import { Send, X, ShieldCheck, Wallet, AlertTriangle, Camera, Brain, FileCheck, Loader2, CheckCircle, Ban, LockKeyhole } from 'lucide-react';
+import { UserProfile, ChatMessage, ContractType, DigitalContract } from '../types';
+import { Send, X, ShieldCheck, Wallet, AlertTriangle, Camera, Brain, FileCheck, Loader2, CheckCircle, Ban, LockKeyhole, HeartHandshake, FileText, PenTool } from 'lucide-react';
 import { analyzeJobImage } from '../services/geminiService';
 import { messageService } from '../services/messageService';
+import { DigitalContractModal } from './DigitalContractModal';
 
 interface ChatModalProps {
   provider: UserProfile;
   client: UserProfile;
   onClose: () => void;
-  onPayRequest: (amount: number, jobDetails?: { photoUrl: string, analysis: string }) => void;
+  onPayRequest: (amount: number, jobDetails?: { photoUrl: string, analysis: string }, contract?: DigitalContract) => void;
+  contractType?: ContractType;
+  initialRequest?: { 
+    type: ContractType; 
+    description: string; 
+    preferredDate?: string; 
+    duration?: string;
+    isQuote?: boolean;
+    title?: string;
+    budget?: string;
+    photos?: string[];
+  };
 }
 
-export const ChatModal: React.FC<ChatModalProps> = ({ provider, client, onClose, onPayRequest }) => {
+export const ChatModal: React.FC<ChatModalProps> = ({ 
+  provider, 
+  client, 
+  onClose, 
+  onPayRequest,
+  contractType = ContractType.PIN_POINT,
+  initialRequest
+}) => {
+  const isMonthly = contractType === ContractType.MONTHLY;
+  const isPlacementProfession = 
+    provider.category === 'Services à domicile' || 
+    provider.subCategory?.includes('Serveur') ||
+    provider.subCategory?.includes('Ménage') ||
+    provider.subCategory?.includes('Nounou') ||
+    provider.subCategory?.includes('Chambre') ||
+    provider.subCategory?.includes('Gardien');
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [offerAmount, setOfferAmount] = useState('');
   const [showOfferInput, setShowOfferInput] = useState(false);
+  
+  // Digital Contract State
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [activeContract, setActiveContract] = useState<DigitalContract | null>(null);
   
   // Image & AI State
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -39,6 +71,38 @@ export const ChatModal: React.FC<ChatModalProps> = ({ provider, client, onClose,
 
   useEffect(() => {
       loadMessages();
+      
+      // Send initial request if present and no messages yet
+      const conv = messageService.getOrCreateConversation(client, provider);
+      if (initialRequest && conv.messages.length === 0) {
+          if (initialRequest.isQuote) {
+            // Logic for QUOTE
+            const budgetStr = initialRequest.budget ? `\nBudget: ${initialRequest.budget} FCFA` : '';
+            const message = `PROJET : ${initialRequest.title}\n${initialRequest.description}${budgetStr}`;
+            
+            messageService.sendMessage(client.id, provider.id, message, initialRequest.photos?.[0]);
+            
+            // If more photos, send them as separate messages or just mention them
+            if (initialRequest.photos && initialRequest.photos.length > 1) {
+              initialRequest.photos.slice(1).forEach(photo => {
+                messageService.sendMessage(client.id, provider.id, "Photo complémentaire du projet :", photo);
+              });
+            }
+          } else {
+            // Logic for ORDER
+            const detailStr = initialRequest.type === ContractType.MONTHLY 
+              ? `(Contrat: ${initialRequest.duration})` 
+              : `(Date: ${initialRequest.preferredDate})`;
+            
+            messageService.sendMessage(
+                client.id, 
+                provider.id, 
+                `DEMANDE DE PRESTATION : ${initialRequest.description} ${detailStr}`
+            );
+          }
+          loadMessages();
+      }
+
       // Poll pour synchronisation
       refreshInterval.current = window.setInterval(loadMessages, 3000);
       return () => {
@@ -98,6 +162,11 @@ export const ChatModal: React.FC<ChatModalProps> = ({ provider, client, onClose,
   const handleCreateOffer = () => {
       if(!offerAmount) return;
       
+      if (isMonthly) {
+          setShowContractModal(true);
+          return;
+      }
+      
       // On cherche une image récente pour le contrat
       const lastImageMsg = [...messages].reverse().find(m => m.image && m.senderId === client.id);
       
@@ -105,6 +174,35 @@ export const ChatModal: React.FC<ChatModalProps> = ({ provider, client, onClose,
           photoUrl: lastImageMsg.image!, 
           analysis: lastImageMsg.aiAnalysis?.analysis || "Pas d'analyse" 
       } : undefined);
+  };
+
+  const handleSaveContract = (contract: DigitalContract) => {
+      setActiveContract(contract);
+      setShowContractModal(false);
+      
+      if (contract.status === 'PENDING_PROVIDER') {
+          messageService.sendMessage(
+              client.id, 
+              provider.id, 
+              `📜 CONTRAT DIGITAL GÉNÉRÉ : ${contract.duration} pour ${contract.amount.toLocaleString()} FCFA. Signature du prestataire attendue.`,
+              undefined, 
+              undefined, 
+              true
+          );
+          loadMessages();
+          setOfferAmount(contract.amount.toString());
+      } else if (contract.status === 'SIGNED') {
+          messageService.sendMessage(
+              provider.id,
+              client.id,
+              `✅ CONTRAT SIGNÉ PAR LES DEUX PARTIES. Preuve légale enregistrée. Paiement sécurisé activé.`,
+              undefined,
+              undefined,
+              true
+          );
+          loadMessages();
+          onPayRequest(contract.amount, undefined, contract);
+      }
   };
 
   const handleCloseNegotiation = () => {
@@ -117,7 +215,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({ provider, client, onClose,
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 z-[9998] flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md h-[600px] flex flex-col overflow-hidden relative">
         
         {/* Header */}
@@ -160,9 +258,23 @@ export const ChatModal: React.FC<ChatModalProps> = ({ provider, client, onClose,
         )}
 
         {/* Security Notice */}
-        <div className="bg-red-50 p-2 text-xs text-center text-red-700 border-b border-red-100 flex items-center justify-center gap-1 font-bold">
-           <ShieldCheck size={12} /> Échange de contacts interdit avant paiement
+        <div className="bg-red-50 p-2 text-[10px] text-center text-red-700 border-b border-red-100 flex items-center justify-center gap-1 font-bold italic">
+           <ShieldCheck size={12} /> Échange de contacts interdit avant paiement sécurisé APNET
         </div>
+
+        {isPlacementProfession && isMonthly && (
+           <div className="bg-blue-600 p-2 text-white text-[9px] font-black uppercase tracking-widest text-center flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap">
+              <div className="animate-marquee-slow flex items-center gap-6">
+                 <span className="flex items-center gap-1"><ShieldCheck size={10} /> APNET : Tiers de Confiance</span>
+                 <span className="flex items-center gap-1"><CheckCircle size={10} /> Salaire Garanti pour l'Artisan</span>
+                 <span className="flex items-center gap-1"><HeartHandshake size={10} /> Remboursé si insatisfait</span>
+                 {/* Double for loop effect */}
+                 <span className="flex items-center gap-1"><ShieldCheck size={10} /> APNET : Tiers de Confiance</span>
+                 <span className="flex items-center gap-1"><CheckCircle size={10} /> Salaire Garanti pour l'Artisan</span>
+                 <span className="flex items-center gap-1"><HeartHandshake size={10} /> Remboursé si insatisfait</span>
+              </div>
+           </div>
+        )}
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
@@ -191,6 +303,24 @@ export const ChatModal: React.FC<ChatModalProps> = ({ provider, client, onClose,
                         </div>
                     )}
                     {msg.text}
+
+                    {msg.isSystem && msg.text.includes('CONTRAT DIGITAL GÉNÉRÉ') && (
+                        <button 
+                            onClick={() => setShowContractModal(true)}
+                            className="mt-3 flex items-center gap-2 bg-white text-brand-blue px-3 py-2 rounded-lg mx-auto text-[10px] uppercase font-black tracking-widest shadow-sm hover:scale-105 transition-transform"
+                        >
+                            <PenTool size={12} /> Voir & Signer le Contrat
+                        </button>
+                    )}
+
+                    {msg.isSystem && msg.text.includes('CONTRAT SIGNÉ') && (
+                        <button 
+                            onClick={() => setShowContractModal(true)}
+                            className="mt-3 flex items-center gap-2 bg-white text-green-700 px-3 py-2 rounded-lg mx-auto text-[10px] uppercase font-black tracking-widest shadow-sm"
+                        >
+                            <FileCheck size={12} /> Voir le Contrat Finalisé
+                        </button>
+                    )}
                  </div>
               </div>
            ))}
@@ -278,7 +408,29 @@ export const ChatModal: React.FC<ChatModalProps> = ({ provider, client, onClose,
            </div>
         </div>
 
+        {showContractModal && (
+            <DigitalContractModal 
+                isOpen={showContractModal}
+                onClose={() => setShowContractModal(false)}
+                currentUser={client}
+                counterPart={provider}
+                contractType={contractType}
+                initialAmount={parseInt(offerAmount) || 0}
+                onSave={handleSaveContract}
+                existingContract={activeContract || undefined}
+            />
+        )}
+
       </div>
+      <style>{`
+        @keyframes marquee-slow {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee-slow {
+          animation: marquee-slow 20s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };

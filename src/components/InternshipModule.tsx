@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { InternshipRequest, InternshipType, InternshipStatus, UserProfile, ViewState, InternshipOffer } from '../types';
+import { InternshipRequest, InternshipType, InternshipStatus, UserProfile, ViewState, InternshipOffer, PrivateInternshipData } from '../types';
 import { ABIDJAN_COMMUNES, NEARBY_LOCATIONS, INTERNSHIP_SERVICE_FEE } from '../constants';
-import { GraduationCap, MapPin, Upload, Send, CheckCircle, AlertCircle, Briefcase, Clock, DollarSign, FileText, Calendar, Mail, Building2 } from 'lucide-react';
+import { GraduationCap, MapPin, Upload, Send, CheckCircle, AlertCircle, Briefcase, Clock, DollarSign, FileText, Calendar, Mail, Building2, Sparkles, Wand2, Lock } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 
 interface InternshipModuleProps {
   currentUser?: UserProfile | null;
-  onSubmitRequest: (request: Omit<InternshipRequest, 'id' | 'dateSubmitted' | 'status'>) => void;
+  onSubmitRequest: (request: Omit<InternshipRequest, 'id' | 'dateSubmitted' | 'status'>, privateData?: Partial<PrivateInternshipData>) => void;
   userRequests: InternshipRequest[];
   onPayFee: (requestId: string) => void;
   setView: (view: any) => void;
@@ -26,6 +27,13 @@ export const InternshipModule: React.FC<InternshipModuleProps> = ({ currentUser,
   const [quartier, setQuartier] = useState('');
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [cvFile, setCvFile] = useState<File | null>(null);
+  
+  // Premium & AI States
+  const [isPremiumPaid, setIsPremiumPaid] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [selectedOffer, setSelectedOffer] = useState<InternshipOffer | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiCoverLetter, setAiCoverLetter] = useState('');
   
   // Validation State
   const [emailError, setEmailError] = useState('');
@@ -92,7 +100,7 @@ export const InternshipModule: React.FC<InternshipModuleProps> = ({ currentUser,
     // This resolves the "Link Empty" issue for new uploads
     const cvUrl = URL.createObjectURL(cvFile);
 
-    const newRequest = {
+    const reqData = {
       studentId: currentUser?.id,
       fullName,
       email,
@@ -104,20 +112,64 @@ export const InternshipModule: React.FC<InternshipModuleProps> = ({ currentUser,
         quartier,
       },
       phone,
-      cvUrl
+      cvUrl,
     };
 
-    onSubmitRequest(newRequest);
-    setActiveTab('MY_REQUESTS');
+    const privateData = aiCoverLetter ? {
+      aiCoverLetter: aiCoverLetter
+    } : undefined;
+
+    onSubmitRequest(reqData, privateData);
     
     // Reset form
     setField('');
     setQuartier('');
     setCvFile(null);
     setEmail('');
+    setIsPremiumPaid(false);
+    setSelectedOffer(null);
+    setAiCoverLetter('');
     if(!currentUser) setFullName('');
+  };
+
+  const handlePayment = () => {
+    setIsPaying(true);
+    // Simulate Payment API call
+    setTimeout(() => {
+      setIsPremiumPaid(true);
+      setIsPaying(false);
+      alert("Paiement de 5000 FCFA validé ! Les services Premium (Upload CV, Assistant IA) sont maintenant activés.");
+    }, 2000);
+  };
+
+  const generateAILetter = async () => {
+    if (!cvFile || !selectedOffer) return;
     
-    alert("Votre candidature a été enregistrée avec succès. APNET contacte les partenaires et vous revient.");
+    setIsAnalyzing(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = `
+        En tant qu'assistant de recrutement APNET, analyse ce dossier de candidature pour un stage.
+        Offre : ${selectedOffer.title} chez ${selectedOffer.companyName} (${selectedOffer.type})
+        Candidat : ${fullName}, Filière : ${field}
+        
+        Génère une lettre de motivation professionnelle, percutante et adaptée au marché ivoirien. 
+        La lettre doit mettre en avant l'adéquation entre la formation du candidat et les besoins de l'entreprise.
+        Sois formel et enthousiaste.
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+      });
+
+      setAiCoverLetter(response.text || '');
+    } catch (error) {
+      console.error("AI Generation Error:", error);
+      alert("Erreur lors de l'analyse IA. Veuillez réessayer.");
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const renderStatusBadge = (status: InternshipStatus) => {
@@ -189,36 +241,68 @@ export const InternshipModule: React.FC<InternshipModuleProps> = ({ currentUser,
                     <p className="text-sm text-gray-500">Postulez directement aux offres qui vous intéressent. Seules les offres validées par APNET sont affichées.</p>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {offers.filter(o => o.status === 'APPROVED').map(offer => (
-                        <div key={offer.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                            <div className="flex justify-between items-start mb-4">
-                                <span className="px-2 py-1 bg-blue-50 text-blue-700 text-[10px] font-black rounded uppercase">{offer.type}</span>
-                                <span className="text-[10px] text-gray-400">{new Date(offer.postedAt).toLocaleDateString()}</span>
-                            </div>
-                            <h4 className="text-lg font-bold text-gray-900 mb-1">{offer.title}</h4>
-                            <p className="text-brand-orange font-bold text-sm mb-4">{offer.companyName}</p>
-                            
-                            <div className="space-y-2 mb-6">
-                                <div className="flex items-center gap-2 text-xs text-gray-600">
-                                    <MapPin size={14} /> {offer.location}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {offers.filter(o => o.status === 'APPROVED').map(offer => {
+                        const isAdmin = currentUser?.role === 'ADMIN';
+                        const isUnlocked = isPremiumPaid && selectedOffer?.id === offer.id;
+                        const displayCompanyName = (isAdmin || isUnlocked) ? offer.companyName : `Entreprise Partenaire - Secteur ${offer.title.split(' ')[0]} / ${offer.type}`;
+                        const displayLocation = (isAdmin || isUnlocked) ? offer.location : "Abidjan (Localisation confidentielle)";
+                        
+                        return (
+                            <div key={offer.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow relative overflow-hidden group">
+                                {!(isAdmin || isUnlocked) && (
+                                    <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                                        <Building2 size={80} className="-mr-8 -mt-8 rotate-12" />
+                                    </div>
+                                )}
+                                
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className="px-2 py-1 bg-blue-50 text-blue-700 text-[10px] font-black rounded uppercase">{offer.type}</span>
+                                    <span className="text-[10px] text-gray-400">{new Date(offer.postedAt).toLocaleDateString()}</span>
                                 </div>
-                                <div className="flex items-center gap-2 text-xs text-gray-600">
-                                    <Clock size={14} /> {offer.duration}
+                                
+                                <h4 className="text-lg font-bold text-gray-900 mb-1">{offer.title}</h4>
+                                
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className={`w-6 h-6 rounded flex items-center justify-center text-[8px] font-black text-white ${(isAdmin || isUnlocked) ? 'bg-brand-blue' : 'bg-gray-300 animate-pulse'}`}>
+                                        {(isAdmin || isUnlocked) ? offer.companyName.substring(0, 2) : '?'}
+                                    </div>
+                                    <p className={`font-bold text-sm ${(isAdmin || isUnlocked) ? 'text-brand-orange' : 'text-gray-400 italic'}`}>
+                                        {displayCompanyName}
+                                        {!(isAdmin || isUnlocked) && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-brand-orange/30 animate-ping"></span>}
+                                    </p>
+                                </div>
+                                
+                                <div className="space-y-2 mb-6">
+                                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                                        <MapPin size={14} className="text-gray-400" /> {displayLocation}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                                        <Clock size={14} className="text-gray-400" /> {offer.duration}
+                                    </div>
+                                </div>
+                                
+                                <div className="flex flex-col gap-2">
+                                    <button 
+                                        onClick={() => {
+                                            setField(offer.title);
+                                            setSelectedOffer(offer);
+                                            setActiveTab('FORM');
+                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                        }}
+                                        className="w-full py-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+                                    >
+                                        {(isAdmin || isUnlocked) ? "Gérer l'offre" : "Débloquer et postuler avec APNET (5000 FCFA)"}
+                                    </button>
+                                    {!(isAdmin || isUnlocked) && (
+                                        <p className="text-[10px] text-center text-gray-400 font-medium italic">
+                                            L'identité de l'entreprise sera révélée après validation de votre paiement.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
-                            
-                            <button 
-                                onClick={() => {
-                                    setField(offer.title);
-                                    setActiveTab('FORM');
-                                }}
-                                className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition"
-                            >
-                                Postuler à cette offre
-                            </button>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
          )}
@@ -230,6 +314,35 @@ export const InternshipModule: React.FC<InternshipModuleProps> = ({ currentUser,
                </h2>
                
                <form onSubmit={handleSubmit} className="space-y-6">
+                  {selectedOffer && (
+                     <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6 animate-in fade-in slide-in-from-top-2">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                           <div>
+                              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Offre en cours de déblocage</p>
+                              <h4 className="text-lg font-black text-gray-900">{selectedOffer.title}</h4>
+                              <p className="text-sm font-bold text-brand-orange">
+                                 {isPremiumPaid ? selectedOffer.companyName : "Identité masquée"}
+                              </p>
+                           </div>
+                           {!isPremiumPaid ? (
+                              <button 
+                                 type="button"
+                                 onClick={handlePayment}
+                                 disabled={isPaying}
+                                 className="w-full md:w-auto bg-brand-orange text-white px-6 py-3 rounded-xl font-black text-sm shadow-xl shadow-orange-200 hover:bg-orange-600 transition flex items-center justify-center gap-2"
+                              >
+                                 {isPaying ? <Clock size={16} className="animate-spin" /> : <DollarSign size={16} />}
+                                 Payer les 5000 FCFA
+                              </button>
+                           ) : (
+                              <div className="bg-green-100 text-green-700 px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm">
+                                 <CheckCircle size={20} /> Paiement Validé
+                              </div>
+                           )}
+                        </div>
+                     </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Nom Complet</label>
@@ -345,21 +458,82 @@ export const InternshipModule: React.FC<InternshipModuleProps> = ({ currentUser,
                      )}
                   </div>
 
-                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 cursor-pointer transition relative group">
-                     <input 
-                       type="file" 
-                       className="absolute inset-0 opacity-0 cursor-pointer" 
-                       accept=".pdf,.doc,.docx"
-                       onChange={e => setCvFile(e.target.files?.[0] || null)}
-                     />
-                     <Upload className="mx-auto text-gray-400 mb-2 group-hover:text-blue-500 transition-colors" size={32} />
-                     <p className="font-medium text-gray-700 group-hover:text-blue-600">{cvFile ? cvFile.name : "Cliquez pour télécharger votre CV (PDF)"}</p>
-                     <p className="text-xs text-gray-400">Obligatoire (Max 5 Mo)</p>
-                  </div>
+                   <div className={`space-y-6 ${!isPremiumPaid ? 'opacity-40 grayscale pointer-events-none select-none relative' : ''}`}>
+                      {!isPremiumPaid && (
+                         <div className="absolute inset-0 z-10 flex items-center justify-center p-8 text-center bg-white/60 backdrop-blur-[2px] rounded-2xl">
+                            <div className="max-w-xs">
+                               <div className="bg-white p-4 rounded-2xl shadow-xl border border-gray-100 mb-4 inline-block">
+                                  <Clock size={32} className="text-brand-orange mx-auto animate-pulse" />
+                               </div>
+                               <h4 className="font-bold text-gray-900 mb-2">Section Verrouillée</h4>
+                               <p className="text-xs text-gray-500 font-medium">
+                                  Veuillez d'abord régler les frais de recherche de 5000 FCFA pour activer l'upload du CV et l'Assistant IA.
+                               </p>
+                            </div>
+                         </div>
+                      )}
+
+                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 cursor-pointer transition relative group">
+                         <input 
+                           type="file" 
+                           className="absolute inset-0 opacity-0 cursor-pointer" 
+                           accept=".pdf,.doc,.docx"
+                           disabled={!isPremiumPaid}
+                           onChange={e => setCvFile(e.target.files?.[0] || null)}
+                         />
+                         <Upload className="mx-auto text-gray-400 mb-2 group-hover:text-blue-500 transition-colors" size={32} />
+                         <p className="font-medium text-gray-700 group-hover:text-blue-600">{cvFile ? cvFile.name : "Cliquez pour télécharger votre CV (PDF)"}</p>
+                         <p className="text-xs text-gray-400">Obligatoire (Max 5 Mo)</p>
+                      </div>
+
+                      {cvFile && isPremiumPaid && (
+                         <div className="bg-brand-dark text-white p-6 rounded-2xl shadow-xl relative overflow-hidden border border-white/10">
+                            <div className="absolute -top-12 -right-12 w-32 h-32 bg-brand-orange/20 rounded-full blur-2xl"></div>
+                            <div className="relative z-10">
+                               <div className="flex items-center gap-3 mb-4">
+                                  <div className="p-2 bg-brand-orange rounded-xl">
+                                     <Sparkles size={24} className="text-white" />
+                                  </div>
+                                  <div>
+                                     <h4 className="font-black text-lg">Assistant IA Premium</h4>
+                                     <p className="text-[10px] text-gray-300 uppercase tracking-widest font-black">Analyse & Optimisation</p>
+                                  </div>
+                               </div>
+                               
+                               {!aiCoverLetter ? (
+                                  <button 
+                                     type="button"
+                                     onClick={generateAILetter}
+                                     disabled={isAnalyzing}
+                                     className="w-full py-4 bg-white text-brand-dark rounded-xl font-black text-sm hover:bg-gray-100 transition flex items-center justify-center gap-2 group"
+                                  >
+                                     {isAnalyzing ? <Clock size={16} className="animate-spin" /> : <Wand2 size={16} className="group-hover:rotate-12 transition-transform" />}
+                                     {isAnalyzing ? "Analyse du CV en cours..." : "Générer ma Lettre de Motivation (IA)"}
+                                  </button>
+                               ) : (
+                                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                                     <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center justify-center min-h-[100px] text-center">
+                                        <div className="space-y-2">
+                                           <Lock size={24} className="text-brand-orange mx-auto opacity-50" />
+                                           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Contenu Sécurisé APNET</p>
+                                           <p className="text-[11px] text-gray-300 leading-relaxed font-medium italic px-4">
+                                              "La lettre de motivation optimisée a été générée et stockée de manière confidentielle. Elle sera transmise exclusivement à l'entreprise pour garantir votre avantage compétitif."
+                                           </p>
+                                        </div>
+                                     </div>
+                                     <div className="flex items-center gap-2 text-[10px] text-brand-green font-bold bg-brand-green/10 p-2 rounded-lg justify-center">
+                                        <CheckCircle size={14} /> Dossier de candidature optimisé par l'IA.
+                                     </div>
+                                  </div>
+                               )}
+                            </div>
+                         </div>
+                      )}
+                   </div>
 
                   <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
                      <p className="text-sm text-blue-900 font-medium">
-                        <span className="font-bold">Note Importante :</span> L'inscription est gratuite. Les frais de service de <span className="font-bold">{INTERNSHIP_SERVICE_FEE} FCFA</span> ne sont à payer QUE si APNET vous trouve un stage confirmé.
+                        <span className="font-bold">Note Importante :</span> Les frais de recherche s'élèvent à 5000 FCFA, payables immédiatement pour valider le dossier. APNET s'engage : si aucun stage n'est trouvé, vous êtes remboursé à 100%.
                      </p>
                   </div>
 
@@ -401,7 +575,7 @@ export const InternshipModule: React.FC<InternshipModuleProps> = ({ currentUser,
                                     <CheckCircle size={18} /> Bonne nouvelle ! Un stage a été trouvé.
                                  </h4>
                                  <p className="text-sm text-green-700 mb-3">
-                                    Une entreprise correspondant à votre profil ({request.matchedCompany || 'Partenaire APNET'}) est prête à recevoir votre CV.
+                                    Une entreprise correspondant à votre profil ({currentUser?.role === 'ADMIN' ? (request.matchedCompany || 'Partenaire APNET') : 'Entreprise Partenaire APNET'}) est prête à recevoir votre CV.
                                     Veuillez régler les frais de service pour valider la mise en relation et recevoir la convocation.
                                  </p>
                                  <button 

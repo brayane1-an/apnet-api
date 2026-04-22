@@ -5,7 +5,8 @@ import {
   ViewState, UserProfile, UserRole, UserStatus, JobOffer, Transaction, 
   ServiceMode, PaymentMethod, RealEstateListing, PropertyType,
   InternshipRequest, DeliveryOrder, Advertisement, RiderLevel,
-  InternshipOffer
+  InternshipOffer, ContractType, DigitalContract, InternshipStatus,
+  PrivateInternshipData, ApplicationStatus
 } from './types';
 import { 
   MOCK_PROVIDERS, MOCK_JOBS, MOCK_ADS, MOCK_DELIVERY_ORDERS, 
@@ -42,7 +43,9 @@ import { RiderJobBoard } from './components/RiderJobBoard';
 import { RecruiterSpace } from './components/RecruiterSpace';
 import { TermsOfService } from './components/TermsOfService';
 import { OfficialMessage } from './components/OfficialMessage';
-import QuoteRequestModal from './components/QuoteRequestModal';
+import { UniversalOrderModal } from './components/UniversalOrderModal';
+import { QuoteRequestModal } from './components/QuoteRequestModal';
+import { jobService } from './services/jobService';
 import { AdBanner } from './components/Advertisement';
 import SafetyTips from './components/SafetyTips';
 import Features from './components/Features';
@@ -52,25 +55,37 @@ import { MessagesView } from './components/MessagesView';
 import { AdCarousel, CertifiedCompanies, AdvertiserCTA } from './components/AdRegistry';
 import { adService } from './services/adService';
 import { RealEstateFeed, WorksFeed, LandlordOnboardingForm } from './components/HomeFeed';
+import { SmartSearch } from './components/SmartSearch';
 
 export default function App() {
   const [view, setViewInternal] = useState<ViewState>(ViewState.HOME);
   const [viewHistory, setViewHistory] = useState<ViewState[]>([]);
   const [direction, setDirection] = useState(1);
+  const [deliveryStep, setDeliveryStep] = useState<'ESTIMATE' | 'DETAILS'>('ESTIMATE');
 
   const setView = (newView: ViewState, clearHistory: boolean = false) => {
-    if (clearHistory) {
-      setDirection(-1);
-      setViewHistory([]);
+    if (newView !== view) {
+      if (clearHistory) {
+        setDirection(-1);
+        setViewHistory([]);
+      } else {
+        setDirection(1);
+        setViewHistory(prev => [...prev, view]);
+      }
       setViewInternal(newView);
-    } else if (newView !== view) {
-      setDirection(1);
-      setViewHistory(prev => [...prev, view]);
-      setViewInternal(newView);
+      if (newView === ViewState.DELIVERY_ESTIMATOR) {
+        setDeliveryStep('ESTIMATE');
+      }
     }
   };
 
   const handleBack = () => {
+    if (view === ViewState.DELIVERY_ESTIMATOR && deliveryStep === 'DETAILS') {
+      setDirection(-1);
+      setDeliveryStep('ESTIMATE');
+      return;
+    }
+
     setDirection(-1);
     if (viewHistory.length > 0) {
       const prevView = viewHistory[viewHistory.length - 1];
@@ -131,6 +146,33 @@ export default function App() {
   const [selectedProvider, setSelectedProvider] = useState<UserProfile | null>(null);
   const [serviceMode, setServiceMode] = useState<ServiceMode>(ServiceMode.DAILY);
   
+  const closeOrderModal = React.useCallback(() => setShowOrderModal(false), []);
+  const closeQuoteModal = React.useCallback(() => setShowQuoteModal(false), []);
+  const closeChatModal = React.useCallback(() => {
+    setShowChat(false);
+    setPendingOrderData(null);
+    setPendingQuoteData(null);
+  }, []);
+  const closePaymentModal = React.useCallback(() => setShowPayment(false), []);
+  const closeSubscriptionModal = React.useCallback(() => setShowSubscriptionModal(false), []);
+
+  const handleSelectService = React.useCallback((c: string, s: string, sp: string) => {
+    setCategory(c); 
+    setSubCategory(s); 
+    setSpecialization(sp);
+    setView(ViewState.FIND_WORKER);
+  }, []);
+
+  const handleRequestOrder = React.useCallback((c: string, s: string, isDevis: boolean) => {
+    if (isDevis) {
+      setQuoteModalDetails({ category: c, subCategory: s });
+      setShowQuoteModal(true);
+    } else {
+      setOrderModalDetails({ category: c, subCategory: s });
+      setShowOrderModal(true);
+    }
+  }, []);
+  
   const [realEstatePaymentData, setRealEstatePaymentData] = useState<{
     amount: number;
     listing: RealEstateListing;
@@ -144,15 +186,26 @@ export default function App() {
   const [chatProvider, setChatProvider] = useState<UserProfile | null>(null);
   const [pendingContractDetails, setPendingContractDetails] = useState<{ photoUrl: string, analysis: string } | undefined>(undefined);
   
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [orderModalDetails, setOrderModalDetails] = useState<{category: string, subCategory: string} | null>(null);
+  const [pendingOrderData, setPendingOrderData] = useState<{type: ContractType, description: string, preferredDate?: string, duration?: string} | null>(null);
+
   const [showQuoteModal, setShowQuoteModal] = useState(false);
-  const [quoteRequestDetails, setQuoteRequestDetails] = useState<{category: string, subCategory: string} | null>(null);
+  const [quoteModalDetails, setQuoteModalDetails] = useState<{category: string, subCategory: string} | null>(null);
+  const [pendingQuoteData, setPendingQuoteData] = useState<{title: string, description: string, budget?: string, photos: string[]} | null>(null);
 
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [currentContractType, setCurrentContractType] = useState<ContractType>(ContractType.PIN_POINT);
+
+  const [pendingServiceContract, setPendingServiceContract] = useState<DigitalContract | null>(null);
 
   const [internshipRequests, setInternshipRequests] = useState<InternshipRequest[]>(MOCK_INTERNSHIP_REQUESTS);
+  const [privateInternshipData, setPrivateInternshipData] = useState<PrivateInternshipData[]>([]);
   const [internshipOffers, setInternshipOffers] = useState<InternshipOffer[]>(MOCK_INTERNSHIP_OFFERS);
   const [deliveryOrders, setDeliveryOrders] = useState<DeliveryOrder[]>(MOCK_DELIVERY_ORDERS);
   const [pendingDeliveryData, setPendingDeliveryData] = useState<Partial<DeliveryOrder> | null>(null);
+  const [pendingInternshipData, setPendingInternshipData] = useState<Omit<InternshipRequest, 'id' | 'dateSubmitted' | 'status'> | null>(null);
+  const [pendingPrivateInternshipData, setPendingPrivateInternshipData] = useState<Partial<PrivateInternshipData> | null>(null);
   const [adminBalance, setAdminBalance] = useState(0);
 
   // --- 1. PERSISTENT LOGIN CHECK (TOKEN BASED) ---
@@ -383,6 +436,40 @@ export default function App() {
     }
   };
 
+  const handleDiscussAction = async (provider: UserProfile, isQuote: boolean = false) => {
+    setChatProvider(provider);
+
+    // If we have pending data from Catalog flow, create the mission now that we have a provider
+    if (currentUser) {
+      if (pendingOrderData) {
+        await jobService.createOrderMission(currentUser, provider, pendingOrderData);
+        setPendingOrderData(null);
+        setShowChat(true);
+        return;
+      }
+      if (pendingQuoteData) {
+        await jobService.createQuoteMission(currentUser, provider, pendingQuoteData);
+        setPendingQuoteData(null);
+        setShowChat(true);
+        return;
+      }
+    }
+
+    if (isQuote) {
+      setQuoteModalDetails({ 
+        category: provider.category || 'Services à domicile', 
+        subCategory: provider.subCategory || provider.jobTitle || 'Expert APNET'
+      });
+      setShowQuoteModal(true);
+    } else {
+      setOrderModalDetails({ 
+        category: provider.category || 'Services à domicile', 
+        subCategory: provider.subCategory || provider.jobTitle || 'Expert APNET'
+      });
+      setShowOrderModal(true);
+    }
+  };
+
   const handlePaymentConfirm = (amount: number, isExternal: boolean = false, isSubscription: boolean = false) => {
     if (!currentUser) return;
     if (!isSubscription && !selectedProvider) return;
@@ -390,6 +477,8 @@ export default function App() {
     // 1. Déduction du solde client (Simulation seulement si interne)
     const newBalance = isExternal ? currentUser.walletBalance : currentUser.walletBalance - amount;
     
+    const isPlacementContract = currentContractType === ContractType.MONTHLY && !!pendingServiceContract;
+
     // 2. Création de la transaction pour le CLIENT
     const newTransaction: Transaction = {
       id: `tx_${Date.now()}`,
@@ -399,11 +488,13 @@ export default function App() {
       netAmount: amount,
       providerName: isSubscription 
         ? 'Abonnement Premium APNET'
-        : (pendingDeliveryData 
-            ? `Livraison APNET (${pendingDeliveryData.dropoffAddress?.split(',')[0] || 'Course'})` 
-            : (selectedProvider ? `${selectedProvider.firstName} ${selectedProvider.lastName}` : 'Service')),
+        : (isPlacementContract
+            ? `Placement: ${selectedProvider?.firstName} (Contrat Mensuel)`
+            : (pendingDeliveryData 
+                ? `Livraison APNET (${pendingDeliveryData.dropoff?.quartier || 'Course'})` 
+                : (selectedProvider ? `${selectedProvider.firstName} ${selectedProvider.lastName}` : 'Service'))),
       type: isSubscription ? 'SUBSCRIPTION' : (isExternal ? 'DEPOSIT' : 'PAYMENT'),
-      status: pendingDeliveryData ? 'BLOCKED' : 'COMPLETED',
+      status: (pendingDeliveryData || isPlacementContract) ? 'BLOCKED' : 'COMPLETED',
       referenceId: selectedProvider?.id,
       contractImage: pendingContractDetails?.photoUrl,
       aiAnalysis: pendingContractDetails?.analysis
@@ -413,8 +504,9 @@ export default function App() {
     let updatedUser = { 
         ...currentUser, 
         walletBalance: newBalance,
-        pendingBalance: pendingDeliveryData ? (currentUser.pendingBalance || 0) + amount : currentUser.pendingBalance,
-        transactions: [...currentUser.transactions, newTransaction] 
+        pendingBalance: (pendingDeliveryData || isPlacementContract) ? (currentUser.pendingBalance || 0) + amount : currentUser.pendingBalance,
+        transactions: [...currentUser.transactions, newTransaction],
+        contracts: isPlacementContract ? [...(currentUser.contracts || []), pendingServiceContract] : currentUser.contracts
     };
 
     // Gestion spécifique Abonnement
@@ -446,6 +538,29 @@ export default function App() {
         alert(listing.type === PropertyType.RESIDENCE || listing.type === PropertyType.VILLA_WEEKEND 
             ? "Réservation confirmée ! Le propriétaire a été notifié." 
             : "Contact débloqué ! Vous pouvez maintenant voir les coordonnées.");
+    } else if (pendingInternshipData) {
+        // LIAISON PAIEMENT-STAGE : Création de la demande après paiement
+        const requestId = `req_${Date.now()}`;
+        const newReq: InternshipRequest = {
+            ...pendingInternshipData,
+            id: requestId,
+            dateSubmitted: new Date().toISOString(),
+            status: InternshipStatus.VALIDATED
+        };
+
+        // Sauvegarde sécurisée de la lettre IA dans la collection PRIVEE (Propriété APNET)
+        if (pendingPrivateInternshipData?.aiCoverLetter) {
+            const privateData: PrivateInternshipData = {
+                requestId: requestId,
+                aiCoverLetter: pendingPrivateInternshipData.aiCoverLetter
+            };
+            setPrivateInternshipData(prev => [...prev, privateData]);
+        }
+
+        setInternshipRequests(prev => [...prev, newReq]);
+        setPendingInternshipData(null);
+        setPendingPrivateInternshipData(null);
+        alert("Paiement des frais de recherche réussi ! Votre dossier est maintenant prioritaire. APNET s'engage à vous trouver un stage ou à vous rembourser.");
     } else if (pendingDeliveryData) {
         // LIAISON PAIEMENT-LIVRAISON : Création automatique de la commande
         const securityCode = Math.floor(1000 + Math.random() * 9000).toString();
@@ -580,7 +695,99 @@ export default function App() {
   }).sort((a, b) => (b.isCertified ? 1 : 0) - (a.isCertified ? 1 : 0));
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-900">
+    <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-900 selection:bg-brand-orange selection:text-white">
+          {/* CRITICAL MODALS (TOP LEVEL) */}
+          <AnimatePresence>
+            {showOrderModal && orderModalDetails && (
+              <UniversalOrderModal 
+                onClose={closeOrderModal}
+                category={orderModalDetails.category}
+                subCategory={orderModalDetails.subCategory}
+                onSubmit={async (details) => {
+                  setPendingOrderData(details);
+                  setCurrentContractType(details.type);
+                  setShowOrderModal(false);
+                  
+                  if (!currentUser) {
+                    setView(ViewState.REGISTER);
+                  } else {
+                    if (chatProvider) {
+                        await jobService.createOrderMission(currentUser, chatProvider, details);
+                        setPendingOrderData(null);
+                        setShowChat(true);
+                    } else {
+                        alert(`Votre commande pour ${orderModalDetails.subCategory} (${details.type}) est enregistrée. Choisissez maintenant votre prestataire.`);
+                        setView(ViewState.FIND_WORKER);
+                    }
+                  }
+                }}
+              />
+            )}
+
+            {showQuoteModal && quoteModalDetails && (
+              <QuoteRequestModal 
+                onClose={closeQuoteModal}
+                category={quoteModalDetails.category}
+                subCategory={quoteModalDetails.subCategory}
+                onSubmit={async (details) => {
+                  setPendingQuoteData(details);
+                  setShowQuoteModal(false);
+                  
+                  if (!currentUser) {
+                    setView(ViewState.REGISTER);
+                  } else {
+                    if (chatProvider) {
+                        await jobService.createQuoteMission(currentUser, chatProvider, details);
+                        setPendingQuoteData(null);
+                        setShowChat(true);
+                    } else {
+                        alert(`Votre demande de devis pour "${details.title}" est enregistrée. Choisissez maintenant un artisan pour chiffrer votre projet.`);
+                        setView(ViewState.FIND_WORKER);
+                    }
+                  }
+                }}
+              />
+            )}
+
+            {showPayment && selectedProvider && (
+                <PaymentModal 
+                  provider={selectedProvider}
+                  balance={currentUser?.walletBalance || 0}
+                  currentUser={currentUser}
+                  onClose={closePaymentModal}
+                  onConfirm={(amt, ext) => handlePaymentConfirm(amt, ext, false)}
+                  isUnlockFee={serviceMode === ServiceMode.LONG_TERM}
+                  contractType={currentContractType}
+                />
+            )}
+
+            {showSubscriptionModal && currentUser && (
+                <PaymentModal 
+                  balance={currentUser.walletBalance}
+                  currentUser={currentUser}
+                  onClose={closeSubscriptionModal}
+                  onConfirm={(amt, ext) => handlePaymentConfirm(amt, ext, true)}
+                  isSubscription={true}
+                />
+            )}
+
+            {showChat && chatProvider && currentUser && (
+                <ChatModal 
+                  provider={chatProvider}
+                  client={currentUser}
+                  onClose={closeChatModal}
+                  onPayRequest={(amount, contractDetails, contract) => {
+                      setSelectedProvider(chatProvider);
+                      setPendingContractDetails(contractDetails);
+                      if (contract) setPendingServiceContract(contract);
+                      setShowPayment(true);
+                  }}
+                  contractType={currentContractType}
+                  initialRequest={pendingOrderData ? { ...pendingOrderData, isQuote: false } : (pendingQuoteData ? { ...pendingQuoteData, isQuote: true, type: ContractType.PIN_POINT } : undefined)}
+                />
+            )}
+          </AnimatePresence>
+
           <SecurityBanner />
           <Header 
             currentView={view} 
@@ -638,7 +845,7 @@ export default function App() {
                   slotId="PROMO_APNET_VIDEO"
                   onInteract={adService.trackInteraction}
                   onQuoteRequest={(c, s) => {
-                    setQuoteRequestDetails({ category: c, subCategory: s });
+                    setQuoteModalDetails({ category: c, subCategory: s });
                     setShowQuoteModal(true);
                   }}
                 />
@@ -663,6 +870,7 @@ export default function App() {
                                 key={p.id} 
                                 provider={p} 
                                 onHire={handleHire} 
+                                onDiscuss={handleDiscussAction}
                                 serviceMode={ServiceMode.DAILY}
                                 currentUser={currentUser}
                               />
@@ -679,7 +887,7 @@ export default function App() {
                   slotId="PROMO_PARTENAIRE_IMAGE"
                   onInteract={adService.trackInteraction}
                   onQuoteRequest={(c, s) => {
-                    setQuoteRequestDetails({ category: c, subCategory: s });
+                    setQuoteModalDetails({ category: c, subCategory: s });
                     setShowQuoteModal(true);
                   }}
                 />
@@ -699,13 +907,23 @@ export default function App() {
                     <BackButton onClick={handleBack} className="mb-6" />
                     <ServiceCatalog 
                         setView={setView}
-                        onSelectService={(c, s, sp) => {
-                            setCategory(c); setSubCategory(s); setSpecialization(sp);
-                            setView(ViewState.FIND_WORKER);
-                        }}
-                        onRequestQuote={(c, s) => {
-                            setQuoteRequestDetails({ category: c, subCategory: s });
-                            setShowQuoteModal(true);
+                        onSelectService={handleSelectService}
+                        onRequestOrder={handleRequestOrder}
+                    />
+                </div>
+            )}
+
+            {view === ViewState.SMART_SEARCH && (
+                <div className="max-w-7xl mx-auto px-4 pt-6 pb-20">
+                    <BackButton onClick={handleBack} className="mb-6" />
+                    <SmartSearch 
+                        onContact={(provider) => {
+                            setSelectedProvider(provider);
+                            if (currentUser) {
+                                setShowChat(true);
+                            } else {
+                                setView(ViewState.REGISTER);
+                            }
                         }}
                     />
                 </div>
@@ -731,11 +949,7 @@ export default function App() {
                                 key={p.id} 
                                 provider={p} 
                                 onHire={handleHire}
-                                onDiscuss={(prov) => {
-                                    if(!currentUser) { setView(ViewState.REGISTER); return; }
-                                    setChatProvider(prov);
-                                    setShowChat(true);
-                                }}
+                                onDiscuss={handleDiscussAction}
                                 serviceMode={serviceMode}
                                 currentUser={currentUser}
                             />
@@ -819,6 +1033,19 @@ export default function App() {
                         currentUser={currentUser} 
                         setView={setView} 
                         offers={internshipOffers}
+                        allApplications={internshipRequests.map(r => ({
+                            id: r.id,
+                            offerId: 'off_1', 
+                            studentId: r.studentId || r.id,
+                            studentName: r.fullName,
+                            studentLocation: `${r.location.city}, ${r.location.commune || ''} ${r.location.quartier}`,
+                            studentSkills: [r.field],
+                            status: r.status as unknown as ApplicationStatus, 
+                            appliedAt: r.dateSubmitted,
+                            isPremium: !!r.isPremium,
+                            offerTitle: r.offerTitle
+                        }))}
+                        privateInternshipData={privateInternshipData}
                         onPostOffer={(offer) => {
                             const newOffer: InternshipOffer = {
                                 ...offer,
@@ -828,6 +1055,9 @@ export default function App() {
                             };
                             setInternshipOffers([...internshipOffers, newOffer]);
                             alert("Offre soumise ! Elle sera visible après validation par l'équipe APNET.");
+                        }}
+                        onUpdateApplicationStatus={(id, status) => {
+                            setInternshipRequests(prev => prev.map(r => r.id === id ? { ...r, status: status as unknown as InternshipStatus } : r));
                         }}
                         onLogin={(user) => {
                             setCurrentUser(user);
@@ -848,9 +1078,27 @@ export default function App() {
                         currentUser={currentUser}
                         userRequests={internshipRequests.filter(r => r.studentId === currentUser?.id)} 
                         offers={internshipOffers}
-                        onSubmitRequest={(req) => {
-                            const newReq = { ...req, id: `req_${Date.now()}`, dateSubmitted: new Date().toISOString(), status: 'EN_ATTENTE' as any };
-                            setInternshipRequests([...internshipRequests, newReq]);
+                        onSubmitRequest={(req, privateData) => {
+                            if (!currentUser) { setView(ViewState.REGISTER); return; }
+                            setPendingInternshipData(req);
+                            if (privateData) setPendingPrivateInternshipData(privateData);
+                            setSelectedProvider({
+                                id: 'apnet_internship_service',
+                                firstName: "APNET",
+                                lastName: "Stages",
+                                jobTitle: "Service Recherche de Stage",
+                                role: UserRole.PROVIDER,
+                                photoUrl: "https://ais-pre-sj36nhezt2gmp3dgebo46m-185123666437.europe-west2.run.app/favicon.ico",
+                                location: { city: 'Abidjan', quartier: 'Plateau' },
+                                phone: "",
+                                whatsapp: "",
+                                verified: true,
+                                description: "Frais de recherche de stage (Remboursable si aucun résultat)",
+                                walletBalance: 0,
+                                transactions: []
+                            } as UserProfile);
+                            setServiceMode(ServiceMode.DAILY);
+                            setShowPayment(true);
                         }}
                         onPayFee={(reqId) => alert(`Paiement pour demande ${reqId}`)}
                         setView={setView}
@@ -893,6 +1141,8 @@ export default function App() {
                 <div className="max-w-7xl mx-auto px-4 pt-6">
                     <BackButton onClick={handleBack} className="mb-6" />
                     <DeliveryEstimator 
+                        step={deliveryStep}
+                        onStepChange={setDeliveryStep}
                         provider={selectedProvider}
                         currentUser={currentUser}
                         isBadWeather={isBadWeather}
@@ -1021,16 +1271,22 @@ export default function App() {
                             ));
                         }}
                         onReportProblem={(orderId, reason) => {
+                            const isSuspicious = reason.includes("COLIS_SUSPECT");
                             setDeliveryOrders(prev => prev.map(o => 
                                 o.id === orderId ? { 
                                     ...o, 
-                                    status: 'DISPUTED', 
+                                    status: isSuspicious ? 'CANCELLED' : 'DISPUTED', 
                                     isReported: true, 
                                     reportReason: reason,
-                                    isFrozen: true
+                                    isFrozen: !isSuspicious // Suspicious cancellation doesn't need to freeze payment since it's not accepted yet
                                 } : o
                             ));
-                            alert(`Signalement enregistré : ${reason}. Le paiement est gelé pour vérification admin.`);
+                            
+                            if (isSuspicious) {
+                                alert(`🚨 ALERTE SÉCURITÉ : La course a été annulée. Une notification de non-conformité a été envoyée au client. L'administration APNET a été alertée.`);
+                            } else {
+                                alert(`Signalement enregistré : ${reason}. Le paiement est gelé pour vérification admin.`);
+                            }
                         }}
                         onCompleteOrder={(orderId, code) => {
                             const order = deliveryOrders.find(o => o.id === orderId);
@@ -1106,6 +1362,7 @@ export default function App() {
                         proFeedbacks={[]} 
                         clientReviews={[]} 
                         internshipRequests={internshipRequests}
+                        privateInternshipData={privateInternshipData}
                         onUpdateInternshipStatus={(id, status, company) => {
                             setInternshipRequests(prev => prev.map(r => r.id === id ? { ...r, status, matchedCompany: company } : r));
                         }}
@@ -1138,41 +1395,6 @@ export default function App() {
           </main>
 
           <Footer setView={(v) => setView(v, v === ViewState.HOME)} currentUser={currentUser} />
-
-          {/* MODALS */}
-          {showPayment && selectedProvider && (
-              <PaymentModal 
-                provider={selectedProvider}
-                balance={currentUser?.walletBalance || 0}
-                currentUser={currentUser}
-                onClose={() => setShowPayment(false)}
-                onConfirm={(amt, ext) => handlePaymentConfirm(amt, ext, false)}
-                isUnlockFee={serviceMode === ServiceMode.LONG_TERM}
-              />
-          )}
-
-          {showSubscriptionModal && currentUser && (
-              <PaymentModal 
-                balance={currentUser.walletBalance}
-                currentUser={currentUser}
-                onClose={() => setShowSubscriptionModal(false)}
-                onConfirm={(amt, ext) => handlePaymentConfirm(amt, ext, true)}
-                isSubscription={true}
-              />
-          )}
-
-          {showChat && chatProvider && currentUser && (
-              <ChatModal 
-                provider={chatProvider}
-                client={currentUser}
-                onClose={() => setShowChat(false)}
-                onPayRequest={(amount, contractDetails) => {
-                    setSelectedProvider(chatProvider);
-                    setPendingContractDetails(contractDetails);
-                    setShowPayment(true);
-                }}
-              />
-          )}
     </div>
   );
 }

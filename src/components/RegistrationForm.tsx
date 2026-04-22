@@ -22,7 +22,7 @@ interface RegistrationFormProps {
 }
 
 // Étapes du flux global
-type FlowStep = 'PHONE_ENTRY' | 'OTP_VERIFICATION' | 'LOGIN_PIN' | 'REGISTER_WIZARD';
+type FlowStep = 'PHONE_ENTRY' | 'EMAIL_AUTH' | 'OTP_VERIFICATION' | 'LOGIN_PIN' | 'REGISTER_WIZARD';
 // Étapes du wizard d'inscription
 type WizardStep = 'IDENTITY' | 'CATEGORY' | 'JOB_DETAILS' | 'DOCUMENTS' | 'BIO_SECURITY';
 
@@ -46,6 +46,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
 
   // Données communes
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   
   // Données Login
   const [loginPin, setLoginPin] = useState('');
@@ -164,6 +166,32 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
           setIsLoading(false);
           setError(err.message || "Erreur lors de l'envoi du SMS. Vérifiez le numéro.");
       }
+  };
+
+  const handleEmailAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError("Veuillez remplir tous les champs.");
+      return;
+    }
+    
+    setIsLoading(true);
+    setError('');
+    
+    // Tentative de connexion d'abord
+    const loginRes = await authService.loginWithEmail(email, password);
+    if (loginRes.success && loginRes.user) {
+      onRegister(loginRes.user);
+      setIsLoading(false);
+      return;
+    }
+    
+    // Si échec (ex: compte inexistant ou mdp erroné), on propose de continuer vers le wizard
+    // Note: Pour une vraie app, on différencierait l'erreur UserNotFound de WrongPassword
+    setIsNewUser(true);
+    setFlowStep('REGISTER_WIZARD');
+    setWizardStep('IDENTITY');
+    setIsLoading(false);
   };
 
   const handleOtpSubmit = async (e: React.FormEvent) => {
@@ -396,10 +424,19 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
           const newUser: UserProfile = {
               id: userId,
               memberId: memberId,
-              role: role,
+              roles: {
+                isClient: role === UserRole.SEEKER,
+                isProvider: role === UserRole.PROVIDER,
+                isStudent: false,
+                isDelivery: false,
+                isLandlord: role === UserRole.LANDLORD,
+              },
+              activeRole: role as string,
+              role: role, // Legacy support
               firstName,
               lastName,
               phone,
+              email,
               whatsapp: phone,
               photoUrl: photoUrl,
               location: { city, commune: city === 'Abidjan' ? commune : undefined, quartier },
@@ -407,6 +444,26 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
               status: UserStatus.EN_ATTENTE_DE_VALIDATION,
               description,
             
+            providerProfile: role === UserRole.PROVIDER ? {
+                jobTitle: subCategory || 'Prestataire',
+                category: category || '',
+                skills: selectedSkills,
+                languages: [],
+                yearsExperience: 0,
+                bio: description,
+                hourlyRate: 0,
+                location: { city, commune: city === 'Abidjan' ? commune : undefined, quartier },
+                availableDays: [],
+                availableHours: '',
+                isAvailableNow: true,
+                physicalInfo: { height: '', consentVisible: false },
+                certifications: [],
+                rating: 5,
+                totalReviews: 0,
+                isVerified: false,
+                verificationLevel: 'BASIC'
+            } : undefined,
+
             category: role === UserRole.PROVIDER ? category : undefined,
             subCategory: role === UserRole.PROVIDER ? subCategory : undefined,
             specialization: role === UserRole.PROVIDER ? specialization : undefined,
@@ -423,7 +480,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
             completedJobs: 0
         };
 
-        const res = await authService.register(newUser);
+        const res = await authService.register(newUser, createPin);
         setIsLoading(false);
         
         if (res.success && res.user) {
@@ -469,10 +526,57 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
                     <button type="submit" disabled={isLoading} className="w-full bg-brand-orange text-white font-bold py-4 rounded-xl hover:bg-orange-600 transition shadow-lg flex items-center justify-center gap-2">
                         {isLoading ? <Loader2 className="animate-spin" /> : "Continuer"} <ArrowRight size={20} />
                     </button>
+                    <button type="button" onClick={() => setFlowStep('EMAIL_AUTH')} className="w-full text-brand-orange text-sm font-bold hover:underline mt-4">
+                        Se connecter avec Email / Mot de Passe
+                    </button>
                 </form>
             </div>
         </div>
       );
+  }
+
+  if (flowStep === 'EMAIL_AUTH') {
+    return (
+      <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden my-12 border border-gray-100">
+          <div className="bg-brand-dark p-8 text-center text-white">
+              <h2 className="text-2xl font-bold mb-2">Connexion Email</h2>
+              <p className="text-gray-400 text-sm">Entrez vos identifiants pour continuer</p>
+          </div>
+          <div className="p-8">
+              <form onSubmit={handleEmailAuthSubmit} className="space-y-6">
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <input 
+                          type="email" 
+                          value={email} 
+                          onChange={e => setEmail(e.target.value)}
+                          className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-brand-orange"
+                          placeholder="exemple@email.com"
+                          required
+                      />
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+                      <input 
+                          type="password" 
+                          value={password} 
+                          onChange={e => setPassword(e.target.value)}
+                          className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-brand-orange"
+                          placeholder="••••••••"
+                          required
+                      />
+                  </div>
+                  {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
+                  <button type="submit" disabled={isLoading} className="w-full bg-brand-orange text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                      {isLoading ? <Loader2 className="animate-spin" /> : "Se connecter / S'inscrire"}
+                  </button>
+                  <button type="button" onClick={() => setFlowStep('PHONE_ENTRY')} className="w-full text-gray-500 text-sm hover:underline mt-2">
+                       Utiliser un numéro de téléphone
+                  </button>
+              </form>
+          </div>
+      </div>
+    );
   }
 
   if (flowStep === 'OTP_VERIFICATION') {
@@ -592,6 +696,16 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onRegister }
                 <div>
                     <label className="block text-xs font-bold text-gray-500 mb-1">Numéro (Validé)</label>
                     <input type="text" value={phone} disabled className="w-full p-2 border rounded-lg bg-gray-100 text-gray-500 font-bold" />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Email (Optionnel)</label>
+                    <input 
+                        type="email" 
+                        value={email} 
+                        onChange={e => setEmail(e.target.value)} 
+                        className="w-full p-2 border rounded-lg" 
+                        placeholder="exemple@email.com"
+                    />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>

@@ -7,7 +7,9 @@ import {
   signOut, 
   GoogleAuthProvider, 
   signInWithPopup,
-  User as FirebaseUser
+  User as FirebaseUser,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
@@ -42,14 +44,52 @@ export const authService = {
 
     return { success: true, user };
   },
+  
+  // 3. CONNEXION PAR EMAIL
+  loginWithEmail: async (email: string, password: string): Promise<{ success: boolean, user?: UserProfile, message?: string }> => {
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = result.user;
+      
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      if (userDoc.exists()) {
+        const user = userDoc.data() as UserProfile;
+        localStorage.setItem('apnet_current_user', JSON.stringify(user));
+        return { success: true, user };
+      }
+      
+      return { success: false, message: "Profil utilisateur non trouvé." };
+    } catch (error: any) {
+      console.error("Email Login Error:", error);
+      return { success: false, message: "Email ou mot de passe incorrect." };
+    }
+  },
 
-  // 3. ROUTE D'INSCRIPTION
-  register: async (newUser: UserProfile): Promise<{ success: boolean, user?: UserProfile, token?: string, message?: string }> => {
-    const cleanPhone = newUser.phone.replace(/[^0-9]/g, '');
-    const docId = cleanPhone || newUser.id;
-    await setDoc(doc(db, 'users', docId), newUser);
-    localStorage.setItem('apnet_current_user', JSON.stringify(newUser));
-    return { success: true, user: newUser };
+  // 4. ROUTE D'INSCRIPTION
+  register: async (newUser: UserProfile, password?: string): Promise<{ success: boolean, user?: UserProfile, token?: string, message?: string }> => {
+    try {
+      if (newUser.email && password) {
+        // Enregistrement Firebase Auth si email fourni
+        const result = await createUserWithEmailAndPassword(auth, newUser.email, password);
+        newUser.id = result.user.uid;
+      }
+      
+      const cleanPhone = newUser.phone.replace(/[^0-9]/g, '');
+      const docId = newUser.id || cleanPhone;
+      
+      await setDoc(doc(db, 'users', docId), newUser);
+      
+      // Si on a un téléphone, on crée aussi un lien ou un alias si besoin
+      if (cleanPhone && cleanPhone !== newUser.id) {
+        await setDoc(doc(db, 'phone_aliases', cleanPhone), { userId: newUser.id });
+      }
+
+      localStorage.setItem('apnet_current_user', JSON.stringify(newUser));
+      return { success: true, user: newUser };
+    } catch (error: any) {
+      console.error("Registration Error:", error);
+      return { success: false, message: error.message };
+    }
   },
 
   // 4. CONNEXION GOOGLE (Pour Entreprises)

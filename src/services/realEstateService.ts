@@ -1,9 +1,7 @@
 
 // === AJOUT POUR LA GESTION DES CHAMBRES À LOUER ===
 
-// Prix de déblocage des coordonnées pour chambre
-export const ROOM_UNLOCK_PRICE = 2000;
-export const HOUSE_UNLOCK_PRICE = 3000;
+export { ROOM_UNLOCK_FEE as ROOM_UNLOCK_PRICE, RENT_UNLOCK_FEE as HOUSE_UNLOCK_PRICE } from '../constants';
 
 // Vérification disponibilité chambre
 export const checkRoomAvailability = async (roomId: string): Promise<boolean> => {

@@ -1,11 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { RealEstateListing, PropertyType, Location, ViewState, PropertyReview, UserProfile, UserRole, UserStatus } from '../types';
-import { MOCK_REAL_ESTATE_LISTINGS, ABIDJAN_COMMUNES, NEARBY_LOCATIONS, RENTAL_VISIT_FEE, ROOM_VISIT_FEE, TENANT_ENGAGEMENT_TEXT } from '../constants';
-import { MapPin, Search, BedDouble, Bath, Wifi, Waves, Home, Star, PlusCircle, ArrowLeft, Check, AlertCircle, Camera, MessageCircle, Filter, EyeOff, Lock, Unlock, Calendar, Clock, User, Bed, CameraOff, X } from 'lucide-react';
+import { RealEstateListing, PropertyType, Location, ViewState, PropertyReview, UserProfile, UserRole, UserStatus, LandlordServiceLevel, Reservation } from '../types';
+import { MOCK_REAL_ESTATE_LISTINGS, ABIDJAN_COMMUNES, NEARBY_LOCATIONS, RENT_UNLOCK_FEE, SALE_UNLOCK_FEE, ROOM_UNLOCK_FEE, TENANT_ENGAGEMENT_TEXT } from '../constants';
+import { MapPin, Search, BedDouble, Bath, Wifi, Waves, Home, Star, PlusCircle, ArrowLeft, Check, AlertCircle, Camera, MessageCircle, Filter, EyeOff, Lock, Unlock, Calendar, Clock, User, Bed, CameraOff, X, ShieldCheck, Zap, ShieldAlert } from 'lucide-react';
 import { ImageUpload } from './ImageUpload';
 import { RoomCard } from './RoomCard'; // IMPORT DU NOUVEAU COMPOSANT
 import { PropertyCamera } from './PropertyCamera';
+import { AdCarousel } from './AdRegistry';
+import { adService } from '../services/adService';
+import { CheckInOut } from './CheckInOut';
 
 interface RealEstateModuleProps {
   setView: (v: ViewState) => void;
@@ -23,18 +26,47 @@ const PropertyCard: React.FC<{
     isResidence?: boolean;
 }> = ({ listing, onContact, isAdminView, isUnlocked, isResidence }) => {
   const isAvailable = !listing.availability.includes('Indisponible');
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div className={`bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border overflow-hidden flex flex-col h-full group ${!isAvailable ? 'border-red-200 opacity-80' : 'border-gray-200'}`}>
-      <div className="relative h-48 bg-gray-200 overflow-hidden">
-        <img 
-          src={listing.photos[0] || 'https://via.placeholder.com/400x300'} 
-          alt={listing.title} 
-          className={`w-full h-full object-cover transition-transform duration-500 ${isAvailable ? 'group-hover:scale-105' : 'grayscale'}`}
-        />
+      <div className={`relative h-48 bg-gray-100 overflow-hidden flex items-center justify-center`}>
+        {listing.photos[0] && !imgError ? (
+          <img 
+            src={listing.photos[0]} 
+            alt={listing.title} 
+            referrerPolicy="no-referrer"
+            className={`w-full h-full object-cover transition-transform duration-500 ${isAvailable ? 'group-hover:scale-105' : 'grayscale'}`}
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center text-gray-300">
+             <Home size={48} className="mb-2" />
+             <span className="text-[10px] font-bold uppercase tracking-widest">APNET IMMO</span>
+          </div>
+        )}
         <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-gray-800 uppercase tracking-wide">
           {listing.type}
         </div>
+
+        {/* Landlord Service Badges */}
+        {listing.landlordServiceLevel === LandlordServiceLevel.SECURE && (
+          <div className="absolute top-12 left-3 bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-bold shadow-sm flex items-center gap-1">
+             🔍 Locataire Enquêté
+          </div>
+        )}
+        {listing.landlordServiceLevel === LandlordServiceLevel.PREMIUM && (
+          <div className="absolute top-12 left-3 bg-brand-orange text-white px-2 py-1 rounded text-[10px] font-bold shadow-sm flex items-center gap-1">
+             🛡️ Paiement Sécurisé APNET
+          </div>
+        )}
+
+        {/* Protection Badge for Residences */}
+        {(listing.type === PropertyType.RESIDENCE || listing.type === PropertyType.VILLA_WEEKEND) && (
+          <div className="absolute top-3 right-3 bg-green-600 text-white px-2 py-1 rounded text-[9px] font-bold shadow-sm flex items-center gap-1">
+             🛡️ Caution & État des lieux APNET
+          </div>
+        )}
         
         {/* Admin Badge for Unavailable items */}
         {!isAvailable && isAdminView && (
@@ -96,7 +128,13 @@ const PropertyCard: React.FC<{
                 isResidence ? (
                     <>Réserver</>
                 ) : (
-                    isUnlocked ? <>Voir Contact</> : <><Lock size={12} /> Débloquer ({RENTAL_VISIT_FEE} F)</>
+                    isUnlocked ? <>Voir Contact</> : (
+                      <><Lock size={12} /> Débloquer ({
+                        listing.type === PropertyType.ROOM ? ROOM_UNLOCK_FEE : 
+                        listing.type === PropertyType.SALE ? SALE_UNLOCK_FEE : 
+                        RENT_UNLOCK_FEE
+                      } F)</>
+                    )
                 )
              }
            </button>
@@ -119,6 +157,13 @@ const PropertyForm: React.FC<{ onCancel: () => void; onSubmit: (listing: RealEst
   const [isFurnished, setIsFurnished] = useState(false);
   const [hasPool, setHasPool] = useState(false);
   const [hasWifi, setHasWifi] = useState(false);
+  const [airConditioning, setAirConditioning] = useState(false);
+  const [parking, setParking] = useState(false);
+  const [capacity, setCapacity] = useState(1);
+  const [utilitiesIncluded, setUtilitiesIncluded] = useState(false);
+  const [surface, setSurface] = useState('');
+  const [sharedAmenities, setSharedAmenities] = useState('');
+  const [houseRules, setHouseRules] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [showCamera, setShowCamera] = useState(false);
 
@@ -149,7 +194,13 @@ const PropertyForm: React.FC<{ onCancel: () => void; onSubmit: (listing: RealEst
         furnished: isFurnished,
         pool: hasPool,
         wifi: hasWifi,
-        surface: 0
+        airConditioning: airConditioning,
+        parking: parking,
+        capacity: capacity,
+        utilitiesIncluded: utilitiesIncluded,
+        surface: parseInt(surface) || 0,
+        sharedAmenities: sharedAmenities.split(',').map(s => s.trim()).filter(s => s !== ""),
+        houseRules: houseRules
       },
       photos: photos.length > 0 ? photos : ['https://images.unsplash.com/photo-1580587771525-78b9dba3b91d?auto=format&fit=crop&w=800&q=80'], 
       availability: ['Disponible'],
@@ -203,7 +254,9 @@ const PropertyForm: React.FC<{ onCancel: () => void; onSubmit: (listing: RealEst
         {/* Price & Location */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prix (FCFA)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {type === PropertyType.RESIDENCE || type === PropertyType.VILLA_WEEKEND ? 'Prix par nuit (FCFA)' : 'Prix (FCFA)'}
+              </label>
               <input 
                 type="number" 
                 value={price} 
@@ -265,33 +318,90 @@ const PropertyForm: React.FC<{ onCancel: () => void; onSubmit: (listing: RealEst
            </div>
         )}
 
-        {/* Features */}
+        {/* Adaptive Features */}
         <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-           <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Home size={18}/> Caractéristiques</h3>
+           <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Home size={18}/> 
+             {(type === PropertyType.RESIDENCE || type === PropertyType.VILLA_WEEKEND) ? 'Services & Capacité' : (type === PropertyType.ROOM ? 'Règlement & Commodités' : 'Caractéristiques')}
+           </h3>
+           
            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              <div>
-                 <label className="block text-xs font-bold text-gray-500 mb-1">Pièces</label>
-                 <input type="number" min="1" value={rooms} onChange={e => setRooms(parseInt(e.target.value))} className="w-full p-2 border rounded" />
-              </div>
-              <div>
-                 <label className="block text-xs font-bold text-gray-500 mb-1">Salles de bain</label>
-                 <input type="number" min="1" value={bathrooms} onChange={e => setBathrooms(parseInt(e.target.value))} className="w-full p-2 border rounded" />
-              </div>
+              {type !== PropertyType.ROOM && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Pièces</label>
+                    <input type="number" min="1" value={rooms} onChange={e => setRooms(parseInt(e.target.value))} className="w-full p-2 border rounded" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Salles de bain</label>
+                    <input type="number" min="1" value={bathrooms} onChange={e => setBathrooms(parseInt(e.target.value))} className="w-full p-2 border rounded" />
+                  </div>
+                </>
+              )}
+              
+              {(type === PropertyType.RENT || type === PropertyType.SALE) && (
+                <div>
+                   <label className="block text-xs font-bold text-gray-500 mb-1">Surface (m²)</label>
+                   <input type="number" value={surface} onChange={e => setSurface(e.target.value)} className="w-full p-2 border rounded" placeholder="Ex: 120" />
+                </div>
+              )}
+
+              {(type === PropertyType.RESIDENCE || type === PropertyType.VILLA_WEEKEND) && (
+                <div>
+                   <label className="block text-xs font-bold text-gray-500 mb-1">Capacité (pers.)</label>
+                   <input type="number" min="1" value={capacity} onChange={e => setCapacity(parseInt(e.target.value))} className="w-full p-2 border rounded" />
+                </div>
+              )}
            </div>
-           <div className="flex flex-wrap gap-4">
+
+           <div className="flex flex-wrap gap-4 mb-4">
               <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded border border-gray-200 hover:border-brand-orange">
                  <input type="checkbox" checked={isFurnished} onChange={e => setIsFurnished(e.target.checked)} />
                  <span className="text-sm">Meublé</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded border border-gray-200 hover:border-brand-orange">
-                 <input type="checkbox" checked={hasPool} onChange={e => setHasPool(e.target.checked)} />
-                 <span className="text-sm">Piscine</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded border border-gray-200 hover:border-brand-orange">
-                 <input type="checkbox" checked={hasWifi} onChange={e => setHasWifi(e.target.checked)} />
-                 <span className="text-sm">Wifi</span>
-              </label>
+              {(type === PropertyType.RESIDENCE || type === PropertyType.VILLA_WEEKEND || type === PropertyType.RENT || type === PropertyType.SALE) && (
+                <>
+                  <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded border border-gray-200 hover:border-brand-orange">
+                    <input type="checkbox" checked={hasPool} onChange={e => setHasPool(e.target.checked)} />
+                    <span className="text-sm">Piscine</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded border border-gray-200 hover:border-brand-orange">
+                    <input type="checkbox" checked={hasWifi} onChange={e => setHasWifi(e.target.checked)} />
+                    <span className="text-sm">Wifi</span>
+                  </label>
+                </>
+              )}
+              {(type === PropertyType.RESIDENCE || type === PropertyType.VILLA_WEEKEND) && (
+                <>
+                  <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded border border-gray-200 hover:border-brand-orange">
+                    <input type="checkbox" checked={airConditioning} onChange={e => setAirConditioning(e.target.checked)} />
+                    <span className="text-sm">Clim</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded border border-gray-200 hover:border-brand-orange">
+                    <input type="checkbox" checked={parking} onChange={e => setParking(e.target.checked)} />
+                    <span className="text-sm">Parking</span>
+                  </label>
+                </>
+              )}
+              {(type === PropertyType.RENT || type === PropertyType.SALE) && (
+                <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded border border-gray-200 hover:border-brand-orange">
+                  <input type="checkbox" checked={utilitiesIncluded} onChange={e => setUtilitiesIncluded(e.target.checked)} />
+                  <span className="text-sm">Charges comprises</span>
+                </label>
+              )}
            </div>
+
+           {type === PropertyType.ROOM && (
+             <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Commodités partagées (séparées par des virgules)</label>
+                  <input type="text" value={sharedAmenities} onChange={e => setSharedAmenities(e.target.value)} className="w-full p-2 border rounded text-sm" placeholder="Ex: Cuisine, Salon, Douche" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Règlement intérieur</label>
+                  <textarea value={houseRules} onChange={e => setHouseRules(e.target.value)} className="w-full p-2 border rounded text-sm h-20" placeholder="Ex: Pas de musique forte après 22h..." />
+                </div>
+             </div>
+           )}
         </div>
 
         {/* Description */}
@@ -313,7 +423,7 @@ const PropertyForm: React.FC<{ onCancel: () => void; onSubmit: (listing: RealEst
            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {photos.map((photo, index) => (
                 <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200">
-                  <img src={photo} className="w-full h-full object-cover" alt={`Bien ${index}`} />
+                  <img src={photo} className="w-full h-full object-cover" alt={`Bien ${index}`} referrerPolicy="no-referrer" />
                   <button 
                     type="button"
                     onClick={() => setPhotos(photos.filter((_, i) => i !== index))}
@@ -393,12 +503,21 @@ const BookingModal: React.FC<{ listing: RealEstateListing, onClose: () => void, 
     const [time, setTime] = useState('');
     const [name, setName] = useState('');
 
+    const cautionAmount = listing.price * 0.5;
+    const totalAmount = listing.price + cautionAmount;
+
     const handleSubmit = () => {
         if(!date || !time || !name) {
             alert("Veuillez remplir tous les champs.");
             return;
         }
-        onConfirm({ date, time, name });
+        onConfirm({ 
+            date, 
+            time, 
+            name,
+            cautionAmount,
+            totalAmount
+        });
     };
 
     return (
@@ -409,6 +528,11 @@ const BookingModal: React.FC<{ listing: RealEstateListing, onClose: () => void, 
                     <button onClick={onClose}><ArrowLeft size={20}/></button>
                 </div>
                 <div className="p-6 space-y-4">
+                    <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg flex items-center gap-3">
+                        <ShieldCheck className="text-blue-600" size={20} />
+                        <span className="text-xs text-blue-800 font-bold uppercase">Protection Anti-Effrontés Active</span>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium mb-1">Votre Nom Complet</label>
                         <div className="relative">
@@ -433,13 +557,26 @@ const BookingModal: React.FC<{ listing: RealEstateListing, onClose: () => void, 
                         </div>
                     </div>
                     
-                    <div className="bg-orange-50 p-4 rounded-lg text-sm text-orange-800">
-                        <p className="font-bold mb-1">Total à payer : {listing.price.toLocaleString()} FCFA</p>
-                        <p className="text-xs">Le paiement sécurise votre réservation instantanément. Des points de fidélité vous seront attribués.</p>
+                    <div className="bg-gray-50 p-4 rounded-lg space-y-2 border">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Prix de la nuit</span>
+                            <span className="font-bold">{listing.price.toLocaleString()} F</span>
+                        </div>
+                        <div className="flex justify-between text-sm items-center">
+                            <span className="text-gray-600 flex items-center gap-1">
+                                Caution Digitale (50%) <Zap size={10} className="text-brand-orange" />
+                            </span>
+                            <span className="font-bold">{cautionAmount.toLocaleString()} F</span>
+                        </div>
+                        <div className="pt-2 border-t flex justify-between items-center text-brand-orange font-black">
+                            <span>TOTAL À PAYER</span>
+                            <span>{totalAmount.toLocaleString()} FCFA</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 italic">La caution est bloquée et remboursée après le check-out "RAS".</p>
                     </div>
 
-                    <button onClick={handleSubmit} className="w-full bg-brand-orange text-white font-bold py-3 rounded-lg hover:bg-orange-600">
-                        Payer et Réserver
+                    <button onClick={handleSubmit} className="w-full bg-brand-orange text-white font-black py-4 rounded-xl hover:bg-orange-600 shadow-lg transition">
+                        Confirmer & Payer
                     </button>
                 </div>
             </div>
@@ -458,6 +595,9 @@ export const RealEstateModule: React.FC<RealEstateModuleProps> = ({ setView, cur
   const [selectedListing, setSelectedListing] = useState<RealEstateListing | null>(null);
   const [showEngagement, setShowEngagement] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [activeCheckInOut, setActiveCheckInOut] = useState<{ res: Reservation, mode: 'CHECK-IN' | 'CHECK-OUT' } | null>(null);
+  const [showReservations, setShowReservations] = useState(false);
 
   // Search State
   const [searchCity, setSearchCity] = useState<string>('Abidjan');
@@ -556,7 +696,21 @@ export const RealEstateModule: React.FC<RealEstateModuleProps> = ({ setView, cur
         return;
     }
 
+    const getUnlockFee = (type: PropertyType) => {
+      if (type === PropertyType.ROOM) return ROOM_UNLOCK_FEE;
+      if (type === PropertyType.SALE) return SALE_UNLOCK_FEE;
+      return RENT_UNLOCK_FEE;
+    };
+
     const isResidence = listing.type === PropertyType.RESIDENCE || listing.type === PropertyType.VILLA_WEEKEND;
+    
+    // REP SCORE CHECK
+    const residenceScore = currentUser.residenceScore ?? 5;
+    if (isResidence && residenceScore < 3) {
+      alert("⚠️ Réservation non disponible pour ce profil. Votre score de confiance résidence est trop bas.");
+      return;
+    }
+
     const isUnlocked = currentUser.unlockedRealEstateIds?.includes(listing.id);
 
     if (isResidence) {
@@ -572,8 +726,8 @@ export const RealEstateModule: React.FC<RealEstateModuleProps> = ({ setView, cur
         } else {
             // Need to pay
             if(onPaymentRequest) {
-                // Pour les chambres, overridePrice vient de RoomCard (2000), sinon RENTAL_VISIT_FEE (3000)
-                onPaymentRequest(overridePrice || RENTAL_VISIT_FEE, listing);
+                // Pour les chambres, overridePrice vient de RoomCard (2000), sinon RENT_UNLOCK_FEE (3000)
+                onPaymentRequest(overridePrice || getUnlockFee(listing.type), listing);
             } else {
                 alert("Erreur de configuration paiement.");
             }
@@ -623,28 +777,103 @@ export const RealEstateModule: React.FC<RealEstateModuleProps> = ({ setView, cur
        </div>
 
        <div className="max-w-7xl mx-auto px-4 py-8">
+          {/* BANNIÈRE PUBLICITAIRE IMMOBILIER */}
+          <AdCarousel 
+            ads={adService.getAllAds()} 
+            zone="TOP"
+            slotId="REAL_ESTATE_BANNER"
+            onInteract={adService.trackInteraction}
+          />
+
           {mode === 'LIST' ? (
              <>
                 {/* TABS DE NAVIGATION */}
-                <div className="flex justify-center mb-8">
+                <div className="flex justify-center mb-8 gap-4">
                    <div className="bg-white p-1 rounded-full shadow-sm border border-gray-200 inline-flex">
                       <button 
-                          onClick={() => setActiveTab('HOUSES')}
-                          className={`px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'HOUSES' ? 'bg-gray-900 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                          onClick={() => { setActiveTab('HOUSES'); setShowReservations(false); }}
+                          className={`px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'HOUSES' && !showReservations ? 'bg-gray-900 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
                       >
                           <Home size={16} /> Maisons & Villas
                       </button>
                       <button 
-                          onClick={() => setActiveTab('ROOMS')}
-                          className={`px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'ROOMS' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                          onClick={() => { setActiveTab('ROOMS'); setShowReservations(false); }}
+                          className={`px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'ROOMS' && !showReservations ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
                       >
                           <Bed size={16} /> Chambres (Étudiants)
                       </button>
                    </div>
+
+                   {currentUser && (
+                     <button 
+                      onClick={() => setShowReservations(!showReservations)}
+                      className={`px-6 py-2 rounded-full text-sm font-bold border transition-all flex items-center gap-2 ${showReservations ? 'bg-brand-orange text-white border-brand-orange shadow' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                     >
+                       <Calendar size={16} /> Mes Réservations
+                     </button>
+                   )}
                 </div>
 
-                {/* Search & Filters Container */}
-                <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-8 space-y-4">
+                {showReservations ? (
+                  <div className="max-w-4xl mx-auto space-y-6">
+                     <h2 className="text-2xl font-bold flex items-center gap-2"><ShieldCheck className="text-brand-orange" /> Gestion des Séjours</h2>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {reservations.length === 0 ? (
+                           <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-dashed text-gray-400">
+                             Aucune réservation active.
+                           </div>
+                        ) : (
+                          reservations.map(res => (
+                            <div key={res.id} className="bg-white p-6 rounded-2xl border shadow-sm space-y-4">
+                               <div className="flex justify-between items-start">
+                                  <div>
+                                     <h3 className="font-bold text-lg">{res.listingTitle}</h3>
+                                     <p className="text-xs text-gray-500">Date : {res.startDate} à {res.startTime}</p>
+                                  </div>
+                                  <span className={`text-[10px] font-black px-2 py-1 rounded-full ${
+                                    res.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700' : 
+                                    res.status === 'CHECKED_IN' ? 'bg-green-100 text-green-700' : 
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {res.status}
+                                  </span>
+                               </div>
+
+                               <div className="bg-orange-50 p-3 rounded-lg border border-orange-100 flex items-center justify-between">
+                                  <div className="text-xs text-orange-900">
+                                     <p className="font-bold">Caution Bloquée</p>
+                                     <p className="opacity-70">Remboursement après check-out</p>
+                                  </div>
+                                  <span className="font-bold text-orange-900">{res.cautionAmount.toLocaleString()} F</span>
+                               </div>
+
+                               <div className="flex gap-2">
+                                  {res.status === 'CONFIRMED' && (
+                                    <button 
+                                      onClick={() => setActiveCheckInOut({ res, mode: 'CHECK-IN' })}
+                                      className="flex-1 bg-gray-900 text-white font-bold py-2 rounded-lg text-sm flex items-center justify-center gap-2"
+                                    >
+                                      <Camera size={14} /> Faire Check-in
+                                    </button>
+                                  )}
+                                  {res.status === 'CHECKED_IN' && (
+                                    <button 
+                                      onClick={() => setActiveCheckInOut({ res, mode: 'CHECK-OUT' })}
+                                      className="flex-1 bg-brand-orange text-white font-bold py-2 rounded-lg text-sm flex items-center justify-center gap-2"
+                                    >
+                                      <Zap size={14} /> Faire Check-out
+                                    </button>
+                                  )}
+                               </div>
+                            </div>
+                          ))
+                        )}
+                     </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Search & Filters Container */}
+                    <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-8 space-y-4">
                    {/* ... (Search UI kept same as previous) ... */}
                    <div className="flex items-center gap-2 text-gray-800 font-bold mb-2">
                       <Search size={20} className="text-brand-orange"/> Recherche
@@ -762,9 +991,11 @@ export const RealEstateModule: React.FC<RealEstateModuleProps> = ({ setView, cur
                    )}
                 </div>
              </>
-          ) : (
-             <PropertyForm onCancel={() => setMode('LIST')} onSubmit={handleAddListing} />
-          )}
+            )}
+         </>
+      ) : (
+         <PropertyForm onCancel={() => setMode('LIST')} onSubmit={handleAddListing} />
+      )}
 
           {/* Engagement Modal (For Rentals) */}
           {showEngagement && selectedListing && (
@@ -782,11 +1013,70 @@ export const RealEstateModule: React.FC<RealEstateModuleProps> = ({ setView, cur
                  onConfirm={(details) => {
                      // Pass details to parent for payment
                      if(onPaymentRequest) {
-                         onPaymentRequest(selectedListing.price, selectedListing, details);
+                         onPaymentRequest(details.totalAmount, selectedListing, details);
+                         
+                         // SIMULATION: Create Reservation locally
+                         const newRes: Reservation = {
+                           id: `res_${Date.now()}`,
+                           listingId: selectedListing.id,
+                           listingTitle: selectedListing.title,
+                           clientId: currentUser?.id || 'guest',
+                           clientName: details.name,
+                           ownerId: selectedListing.ownerId,
+                           amount: selectedListing.price,
+                           cautionAmount: details.cautionAmount,
+                           cautionStatus: 'HELD',
+                           cautionReleasedAt: null,
+                           status: 'CONFIRMED',
+                           startDate: details.date,
+                           startTime: details.time,
+                           createdAt: new Date().toISOString()
+                         };
+                         setReservations([newRes, ...reservations]);
+                         alert(`Réservation confirmée pour ${details.totalAmount.toLocaleString()} FCFA (Nuit + Caution). Retrouvez-la dans "Mes Réservations".`);
                      }
                      setShowBooking(false);
+                     setSelectedListing(null);
                  }}
               />
+          )}
+
+          {/* Check-in / Check-out Interface */}
+          {activeCheckInOut && (
+            <CheckInOut 
+              reservation={activeCheckInOut.res}
+              mode={activeCheckInOut.mode}
+              onComplete={(photos) => {
+                const updated = reservations.map(r => {
+                  if (r.id === activeCheckInOut.res.id) {
+                    return {
+                      ...r,
+                      status: activeCheckInOut.mode === 'CHECK-IN' ? 'CHECKED_IN' : 'CHECKED_OUT',
+                      checkInPhotos: activeCheckInOut.mode === 'CHECK-IN' ? photos : r.checkInPhotos,
+                      checkOutPhotos: activeCheckInOut.mode === 'CHECK-OUT' ? photos : r.checkOutPhotos,
+                      cautionStatus: activeCheckInOut.mode === 'CHECK-OUT' ? 'RELEASED' : r.cautionStatus,
+                      cautionReleasedAt: activeCheckInOut.mode === 'CHECK-OUT' ? new Date().toISOString() : null
+                    } as Reservation;
+                  }
+                  return r;
+                });
+                setReservations(updated);
+                alert(activeCheckInOut.mode === 'CHECK-IN' ? "Check-in validé. Bon séjour !" : "Check-out validé. Caution en cours de remboursement.");
+                setActiveCheckInOut(null);
+              }}
+              onCancel={() => setActiveCheckInOut(null)}
+              onReport={(note) => {
+                alert(`⚠️ Dégât signalé : "${note}". La caution reste bloquée pour expertise admin.`);
+                const updated = reservations.map(r => {
+                  if (r.id === activeCheckInOut.res.id) {
+                    return { ...r, cautionStatus: 'CLAIMED' } as Reservation;
+                  }
+                  return r;
+                });
+                setReservations(updated);
+                setActiveCheckInOut(null);
+              }}
+            />
           )}
        </div>
     </div>

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { RealEstateListing } from '../types'; 
 import { ROOM_UNLOCK_PRICE, checkRoomAvailability } from '../services/realEstateService';
-import { MapPin, Lock, Loader2, CheckCircle, AlertCircle, Bed } from 'lucide-react';
+import { MapPin, Lock, Loader2, CheckCircle, AlertCircle, Bed, Home } from 'lucide-react';
 
 interface RoomCardProps {
   room: RealEstateListing;
@@ -12,6 +12,7 @@ interface RoomCardProps {
 
 export const RoomCard: React.FC<RoomCardProps> = ({ room, onUnlock, isUnlocked }) => {
   const [checking, setChecking] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const handleUnlock = async () => {
     setChecking(true);
@@ -28,8 +29,21 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onUnlock, isUnlocked }
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all flex flex-col h-full">
-      <div className="relative h-48 bg-gray-200 rounded-lg mb-3 overflow-hidden">
-         <img src={room.photos[0]} className="w-full h-full object-cover" alt={room.title} />
+      <div className="relative h-48 bg-gray-100 rounded-lg mb-3 overflow-hidden flex items-center justify-center">
+         {room.photos[0] && !imgError ? (
+           <img 
+             src={room.photos[0]} 
+             className="w-full h-full object-cover" 
+             alt={room.title} 
+             referrerPolicy="no-referrer"
+             onError={() => setImgError(true)}
+           />
+         ) : (
+           <div className="flex flex-col items-center justify-center text-gray-300">
+             <Home size={40} className="mb-2" />
+             <span className="text-[10px] font-bold uppercase tracking-widest">APNET IMMO</span>
+           </div>
+         )}
          <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded font-bold uppercase flex items-center gap-1">
             <Bed size={12} /> Chambre
          </div>

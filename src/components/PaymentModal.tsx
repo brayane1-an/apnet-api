@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { UserProfile } from '../types';
+import { UserProfile, ContractType } from '../types';
 import { SERVICE_FEE_PERCENTAGE, UNLOCK_CONTACT_FEE, PLATFORM_MAINTENANCE_FEE, COMPANY_SUBSCRIPTION_FEE } from '../constants';
-import { X, ShieldAlert, Wallet, CheckCircle, Lock, Unlock, Smartphone, Award } from 'lucide-react';
+import { X, ShieldAlert, Wallet, CheckCircle, Lock, Unlock, Smartphone, Award, ShieldCheck, HeartHandshake } from 'lucide-react';
 
 interface PaymentModalProps {
   provider?: UserProfile; // Optional for subscription
@@ -12,9 +12,20 @@ interface PaymentModalProps {
   onConfirm: (amount: number, isExternal?: boolean) => void;
   isUnlockFee?: boolean;
   isSubscription?: boolean;
+  contractType?: ContractType;
 }
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({ provider, balance, currentUser, onClose, onConfirm, isUnlockFee = false, isSubscription = false }) => {
+export const PaymentModal: React.FC<PaymentModalProps> = ({ 
+  provider, 
+  balance, 
+  currentUser, 
+  onClose, 
+  onConfirm, 
+  isUnlockFee = false, 
+  isSubscription = false,
+  contractType = ContractType.PIN_POINT
+}) => {
+  const isMonthly = contractType === ContractType.MONTHLY;
   const [amount, setAmount] = useState<string>(
     isSubscription ? COMPANY_SUBSCRIPTION_FEE.toString() : 
     (isUnlockFee ? UNLOCK_CONTACT_FEE.toString() : '')
@@ -86,12 +97,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ provider, balance, c
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
         <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
           <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-            {isSubscription ? <Award size={20} className="text-brand-orange"/> : (isUnlockFee ? <Unlock size={20} className="text-brand-orange"/> : <Wallet size={20}/>)}
-            {step === 'input' ? (isSubscription ? 'Abonnement Premium' : (isUnlockFee ? 'Débloquer le contact' : 'Réserver une prestation')) : 'Confirmer le paiement'}
+            {isSubscription ? <Award size={20} className="text-brand-orange"/> : (isUnlockFee ? <Unlock size={20} className="text-brand-orange"/> : (isMonthly ? <ShieldCheck size={20} className="text-brand-blue"/> : <Wallet size={20}/>))}
+            {step === 'input' ? (isSubscription ? 'Abonnement Premium' : (isUnlockFee ? 'Débloquer le contact' : (isMonthly ? 'Placement Sécurisé APNET' : 'Réserver une prestation'))) : 'Confirmer le paiement'}
           </h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <X size={24} />
@@ -161,6 +172,40 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ provider, balance, c
                      <span className="text-xl">{UNLOCK_CONTACT_FEE.toLocaleString()} FCFA</span>
                    </div>
                 </div>
+              ) : isMonthly ? (
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
+                   <div className="flex items-center gap-2 text-brand-blue font-black uppercase text-xs mb-3">
+                      <ShieldCheck size={18} /> Tiers de Confiance APNET
+                   </div>
+                   <div className="space-y-3">
+                      <div className="flex gap-3">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                          <CheckCircle size={14} className="text-brand-blue" />
+                        </div>
+                        <p className="text-[10px] text-blue-800 leading-tight">
+                          <strong>Sécurité Salaire :</strong> Votre paiement est bloqué sur APNET. Le prestataire est payé sans faute chaque mois : <span className="font-bold underline italic">Fini les impayés.</span>
+                        </p>
+                      </div>
+                      <div className="flex gap-3">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                          <HeartHandshake size={14} className="text-brand-blue" />
+                        </div>
+                        <p className="text-[10px] text-blue-800 leading-tight">
+                          <strong>Garantie Client :</strong> Si l'artisan ne vient pas ou si le travail est mal fait, APNET vous <span className="font-bold underline italic">rembourse ou remplace</span> le profil gratuitement.
+                        </p>
+                      </div>
+                   </div>
+                   <div className="mt-4 pt-4 border-t border-blue-200">
+                    <label className="block text-xs font-black text-blue-900 uppercase tracking-widest mb-2">Salaire Mensuel Convenu (FCFA)</label>
+                    <input
+                      type="number"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="w-full px-4 py-3 bg-white border-2 border-blue-200 rounded-lg text-lg font-black text-brand-blue focus:ring-2 focus:ring-brand-blue focus:outline-none placeholder:text-blue-200"
+                      placeholder="Ex: 50000"
+                    />
+                   </div>
+                </div>
               ) : (
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Montant convenu (FCFA)</label>
@@ -207,7 +252,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ provider, balance, c
                 disabled={!isValid}
                 className="w-full bg-brand-orange text-white font-bold py-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
               >
-                {isSubscription ? "S'abonner maintenant" : (isUnlockFee ? "Débloquer maintenant" : "Continuer")}
+                {isSubscription ? "S'abonner maintenant" : (isUnlockFee ? "Débloquer maintenant" : (isMonthly ? "Initier le Placement" : "Continuer"))}
               </button>
             </>
           ) : (
@@ -224,6 +269,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ provider, balance, c
                     ) : isUnlockFee ? (
                       <p className="text-xs text-red-700 leading-relaxed">
                         Le montant de <strong>{UNLOCK_CONTACT_FEE.toLocaleString()} FCFA</strong> sera débité pour débloquer les contacts. Ces frais ne sont pas remboursables.
+                      </p>
+                    ) : isMonthly ? (
+                      <p className="text-xs text-red-700 leading-relaxed">
+                        Le montant de <strong>{parsedAmount.toLocaleString()} FCFA</strong> sera bloqué par APNET conformément au <strong>Contrat Digital signé</strong>. Le paiement sera libéré à la fin du mois après service fait.
                       </p>
                     ) : (
                        <p className="text-xs text-red-700 leading-relaxed">

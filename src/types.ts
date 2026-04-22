@@ -1,4 +1,47 @@
 
+export enum MissionStatus {
+  REQUESTED = 'REQUESTED',   // Devis envoyé
+  ORDERED = 'ORDERED',       // Commande passée (date/durée fixée)
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+  DISPUTED = 'DISPUTED'
+}
+
+export interface Mission {
+  id: string;
+  clientId: string;
+  clientName: string;
+  providerId: string;
+  providerName: string;
+  providerMatricule: string; // Matricule Professionnel (Ex: APN-MACO-0012)
+  
+  category: string;
+  subCategory: string;
+  
+  type: 'ORDER' | 'QUOTE';
+  contractType: ContractType; // Ponctuelle / Mensuelle
+  
+  title?: string; // For quotes
+  description: string;
+  
+  preferredDate?: string; // For orders (Ponctuelle)
+  duration?: string; // For orders (Monthly)
+  
+  amount?: number; // Montant payé ou estimatif
+  
+  photosBefore: string[];
+  photosAfter: string[];
+  
+  status: MissionStatus;
+  createdAt: string;
+  updatedAt: string;
+  
+  completionDate?: string;
+  isPaid: boolean;
+  transactionId?: string;
+}
+
 export enum UserRole {
   PROVIDER = 'PROVIDER', // Prestataire
   SEEKER = 'SEEKER',     // Demandeur
@@ -11,6 +54,11 @@ export enum UserStatus {
   EN_ATTENTE_DE_VALIDATION = 'EN_ATTENTE_DE_VALIDATION',
   VERIFIE = 'VERIFIE',
   REJETE = 'REJETE',
+}
+
+export enum ContractType {
+  PIN_POINT = 'PONCTUELLE', // Prestation ponctuelle
+  MONTHLY = 'MENSUELLE',  // Contrat mensuel (Placement)
 }
 
 export enum ServiceMode {
@@ -137,6 +185,7 @@ export interface DeliveryQuote {
   apnet_fixed_fee: number; // 100F
   apnet_commission: number; // % commission
   hasLoadingService?: boolean;
+  promoLabel?: string | null;
   details: {
     zone: string;
     distance: string;
@@ -185,6 +234,8 @@ export interface DeliveryOrder {
   
   // VEHICLE TYPE INTEGRATION
   vehicleType?: VehicleType;
+  packageContent?: string;
+  legalComplianceAccepted?: boolean;
 
   // RISK PREMIUM & SECURITY
   isPrecious?: boolean;
@@ -233,6 +284,12 @@ export enum PropertyType {
   ROOM = 'Chambre à louer' // NOUVEAU TYPE POUR CHAMBRES
 }
 
+export enum LandlordServiceLevel {
+  BASIC = 'BASIC',
+  SECURE = 'SECURE',
+  PREMIUM = 'PREMIUM'
+}
+
 export interface PropertyReview {
   id: string;
   authorName: string;
@@ -258,7 +315,14 @@ export interface RealEstateListing {
     furnished: boolean;
     pool: boolean;
     wifi: boolean;
+    airConditioning?: boolean;
+    parking?: boolean;
+    capacity?: number;
+    utilitiesIncluded?: boolean;
+    sharedAmenities?: string[];
+    houseRules?: string;
   };
+  landlordServiceLevel?: LandlordServiceLevel;
   photos: string[]; // Array of URLs
   availability: string[]; // Dates or "Available"
   reviews: PropertyReview[];
@@ -314,6 +378,16 @@ export interface InternshipRequest {
   status: InternshipStatus;
   dateSubmitted: string;
   matchedCompany?: string; // Filled by Admin when status -> MATCHED
+  companyId?: string; // ID of the company linked (for security rules)
+  offerTitle?: string;
+  isPremium?: boolean;
+}
+
+// Propriété exclusive d'APNET - Interdit à l'étudiant
+export interface PrivateInternshipData {
+  requestId: string;
+  aiCoverLetter: string;
+  adminNotes?: string;
 }
 
 // --- ADMIN & FEEDBACK TYPES ---
@@ -358,12 +432,21 @@ export interface DigitalContract {
   id: string;
   prestataire_id: string;
   client_id: string;
+  prestataire_name: string;
+  client_name: string;
   service_title: string;
   amount: number;
-  signature_date: string;
-  signature_ip: string; // "192.168.x.x" (simulé)
-  signature_status: 'signé' | 'en_attente';
+  duration: string;
+  tasks: string[];
+  startDate: string;
+  endDate: string;
+  signature_date?: string;
+  signature_ip?: string;
+  client_signature?: string; // Base64 signature
+  provider_signature?: string; // Base64 signature
+  status: 'DRAFT' | 'PENDING_PROVIDER' | 'SIGNED' | 'COMPLETED' | 'CANCELLED';
   terms_version: string;
+  createdAt: string;
 }
 
 // --- PROMPT 1: SUBSCRIPTION ---
@@ -408,72 +491,137 @@ export interface Conversation {
   unreadCount: Record<string, number>; // { userId: count }
 }
 
+export interface UserRoles {
+  isClient: boolean;
+  isProvider: boolean;
+  isStudent: boolean;
+  isDelivery: boolean;
+  isLandlord: boolean;
+}
+
+export interface ProviderProfile {
+  jobTitle: string;
+  category: string;
+  skills: string[];
+  languages: string[];
+  yearsExperience: number;
+  bio: string;
+  hourlyRate: number;
+  location: Location;
+  availableDays: string[];
+  availableHours: string;
+  isAvailableNow: boolean;
+  physicalInfo: {
+    height?: string;
+    consentVisible: boolean;
+  };
+  certifications: string[];
+  rating: number;
+  totalReviews: number;
+  isVerified: boolean;
+  verificationLevel: string;
+}
+
+export interface StudentProfile {
+  university?: string;
+  fieldOfStudy: string;
+  skills: string[];
+  bio: string;
+}
+
+export interface ClientProfile {
+  preferences?: string[];
+  orderHistorySummary?: string;
+}
+
+export interface DeliveryProfile {
+  vehicleType: VehicleType;
+  licenseNumber?: string;
+  rating: number;
+}
+
 export interface UserProfile {
   id: string;
   memberId?: string; // Matricule Professionnel (Ex: APN-ELEC-0001)
-  role: UserRole;
+  roles: UserRoles;
+  activeRole: string; // e.g. "PROVIDER", "CLIENT", "STUDENT", "DELIVERY", "LANDLORD"
+  
+  // Base Identity
   firstName: string;
   lastName: string;
   photoUrl: string;
-  location: Location;
+  email?: string;
   phone: string;
   whatsapp: string;
+  
+  // Specific Profiles
+  providerProfile?: ProviderProfile;
+  studentProfile?: StudentProfile;
+  clientProfile?: ClientProfile;
+  deliveryProfile?: DeliveryProfile;
+
+  // Global Metadata
   verified: boolean;
   status?: UserStatus;
-  description: string;
-  password?: string; // Stored securely (mocked here)
   
-  // Hierarchical Categorization
-  category?: string;      // e.g. "Bâtiment & Artisanat"
-  subCategory?: string;   // e.g. "Maçon"
-  specialization?: string; // e.g. "Fondation"
+  // Financial & History
+  walletBalance: number;
+  pendingBalance?: number;
+  transactions: Transaction[];
+  notifications?: Notification[];
+  documents?: UserDocument[];
 
-  // Specific to providers
+  // Legacy / Migration fields
+  description?: string;
+  category?: string;
+  subCategory?: string;
+  specialization?: string;
   skills?: string[];
-  jobTitle?: string; // Display title (can be custom or derived from subCategory)
-  rate?: string; // e.g., "5000 FCFA / jour"
-  priceRange?: { min: number; max: number }; // For filtering
+  jobTitle?: string;
   experienceYears?: number;
   rating?: number;
   reviewCount?: number;
-  completedJobs?: number; // Number of jobs successfully finished on platform
+  completedJobs?: number;
   languages?: string[];
   availability?: string[];
   certifications?: string[];
-  
-  // Rider Specific
-  riderStats?: RiderStats; // Only present if the user is a delivery rider
-
-  // Personal Data (Private)
-  walletBalance: number; // Solde disponible
-  pendingBalance?: number; // Solde bloqué (Séquestre) pour les prestataires
-  transactions: Transaction[]; // Personal transaction history
-  references?: Reference[]; // Real user references
-  notifications?: Notification[]; // User notifications
-  withdrawalMethods?: WithdrawalMethod[]; // Comptes Mobile Money liés
-  unlockedProviderIds?: string[]; // IDs of providers whose contact info is paid for
-  
-  // Real Estate
-  realEstateListings?: RealEstateListing[];
-  unlockedRealEstateIds?: string[]; // IDs of rental properties where contact info is paid for
-
-  // Admin Management
-  adminNotes?: AdminNote[]; // Internal notes visible only to admins
-
-  // --- NOUVEAUX CHAMPS (PROMPT 1 & 4) ---
-  subscription?: SubscriptionDetails;
-  contracts?: DigitalContract[]; // Liste des contrats signés
-  busyUntil?: string; // Date ISO jusqu'à laquelle le prestataire est occupé
-  isCertified?: boolean; // Badge de confiance
-  
-  // --- DOCUMENTS (PROMPT GLOBAL) ---
-  documents?: UserDocument[];
-
-  // --- MULTI-COMPTE ---
-  linkedAccountIds?: string[]; // IDs des autres comptes liés volontairement
-
-  // --- ONBOARDING ---
+  isCertified?: boolean;
+  location?: Location;
   hasSeenWalletWelcome?: boolean;
+  linkedAccountIds?: string[];
+  subscription?: SubscriptionDetails;
+  contracts?: DigitalContract[];
+  role?: UserRole;
+  password?: string;
+  unlockedRealEstateIds?: string[];
+  unlockedProviderIds?: string[];
+  riderStats?: RiderStats;
+  busyUntil?: string;
+  adminNotes?: AdminNote[];
+  rate?: string;
+  priceRange?: { min: number, max: number };
+  residenceScore?: number; // Score de confiance pour les résidences (1-5)
+}
+
+export interface Reservation {
+  id: string;
+  listingId: string;
+  listingTitle: string;
+  clientId: string;
+  clientName: string;
+  ownerId: string;
+  amount: number;
+  cautionAmount: number;
+  cautionStatus: 'HELD' | 'RELEASED' | 'CLAIMED';
+  cautionReleasedAt: string | null;
+  status: 'PENDING' | 'CONFIRMED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED';
+  startDate: string;
+  startTime: string;
+  checkInDate?: string;
+  checkOutDate?: string;
+  checkInPhotos?: string[];
+  checkOutPhotos?: string[];
+  createdAt: string;
 }
 
 export interface JobOffer {
@@ -519,6 +667,7 @@ export enum ViewState {
   PROFILE = 'PROFILE',
   MESSAGES = 'MESSAGES',
   RECRUITER_SPACE = 'RECRUITER_SPACE', // Espace Entreprise / Recruteur
+  SMART_SEARCH = 'SMART_SEARCH', // Recherche intelligente avec Gemini
 }
 
 export enum InternshipType {
@@ -552,6 +701,7 @@ export interface InternshipOffer {
 export interface InternshipApplication {
   id: string;
   offerId: string;
+  offerTitle?: string;
   studentId: string;
   studentName: string;
   studentPhoto?: string;

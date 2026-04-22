@@ -212,9 +212,9 @@ export const RiderJobBoard: React.FC<RiderJobBoardProps> = ({
                     <h2 className="text-xl font-black">Tableau des Leaders</h2>
                     <p className="text-xs opacity-90">Classement Hebdomadaire - Top 3 récompensés</p>
                 </div>
-                <div className="divide-y divide-gray-100">
-                    {leaderboard.map((rider, index) => (
-                        <div key={rider.id} className={`flex items-center justify-between p-4 ${rider.id === currentUser.id ? 'bg-yellow-50' : ''}`}>
+          <div className="divide-y divide-gray-100">
+                      {leaderboard.map((rider, index) => (
+                          <div key={rider.id} className={`flex items-center justify-between p-4 ${rider.id === currentUser.id ? 'bg-yellow-50' : ''}`}>
                             <div className="flex items-center gap-4">
                                 <span className={`w-6 h-6 flex items-center justify-center rounded-full font-bold text-xs ${
                                     index === 0 ? 'bg-yellow-400 text-white' : 
@@ -332,7 +332,17 @@ const DeliveryOrderCard: React.FC<{
         </div>
         <div>
            <h3 className="font-bold text-gray-900">{order.description}</h3>
-           <div className="flex flex-wrap gap-2 mt-1">
+           
+           {order.packageContent && (
+               <div className="mt-1 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                   <p className="text-[10px] text-yellow-800 uppercase font-black flex items-center gap-1 mb-1">
+                       <Package size={10} /> Contenu Déclaré par le Client
+                   </p>
+                   <p className="text-xs text-yellow-900 font-bold leading-tight">{order.packageContent}</p>
+               </div>
+           )}
+
+           <div className="flex flex-wrap gap-2 mt-2">
                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">Client: {order.clientName}</span>
                {/* INTEGRATION AFFICHAGE ENGIN */}
                <span className="text-xs text-blue-700 bg-blue-100 px-2 py-0.5 rounded flex items-center gap-1 font-bold">
@@ -515,19 +525,36 @@ const DeliveryOrderCard: React.FC<{
       )}
 
       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-         <div className="flex flex-col">
-            <span className="text-xs text-gray-500">Votre Gain</span>
-            <span className="text-xl font-extrabold text-brand-green">{order.riderGain.toLocaleString()} F</span>
-         </div>
-         
-         {isAvailable && onAccept && (
-            <button 
-               onClick={onAccept}
-               className="bg-gray-900 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-brand-orange transition-colors flex items-center gap-2 shadow-sm active:scale-95 transform"
-            >
-               Accepter
-            </button>
-         )}
+          <div className="flex flex-col">
+             <span className="text-xs text-gray-500">Votre Gain</span>
+             <span className="text-xl font-extrabold text-brand-green">{order.riderGain.toLocaleString()} F</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {isAvailable && (
+               <button 
+                  onClick={() => {
+                      if (window.confirm("Alerte Sécurité : Voulez-vous vraiment signaler ce colis comme suspect ? Cette action annulera la course et alertera l'administration.")) {
+                          if (onReportProblem) onReportProblem(order.id, "COLIS_SUSPECT : Contenu illicite ou dangereux détecté.");
+                      }
+                  }}
+                  className="bg-red-50 text-red-600 p-2.5 rounded-lg border border-red-200 hover:bg-red-100 transition-colors flex items-center gap-2 shadow-sm active:scale-95 transform"
+                  title="Refuser (Colis Suspect)"
+               >
+                  <ShieldAlert size={20} />
+                  <span className="text-xs font-bold hidden sm:inline text-red-700">Refuser (Suspect)</span>
+               </button>
+            )}
+
+            {isAvailable && onAccept && (
+               <button 
+                  onClick={onAccept}
+                  className="bg-gray-900 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-brand-orange transition-colors flex items-center gap-2 shadow-sm active:scale-95 transform"
+               >
+                  Accepter
+               </button>
+            )}
+          </div>
       </div>
     </div>
   );

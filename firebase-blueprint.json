@@ -91,6 +91,34 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["senderId", "receiverId", "content"]
+    },
+    "mission": {
+      "title": "Mission / Job Registry",
+      "description": "Immutable record of a completed or ongoing job.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "providerId": { "type": "string" },
+        "providerName": { "type": "string" },
+        "providerMatricule": { "type": "string" },
+        "category": { "type": "string" },
+        "subCategory": { "type": "string" },
+        "type": { "type": "string", "enum": ["ORDER", "QUOTE"] },
+        "contractType": { "type": "string", "enum": ["PONCTUELLE", "MENSUELLE"] },
+        "description": { "type": "string" },
+        "preferredDate": { "type": "string" },
+        "duration": { "type": "string" },
+        "amount": { "type": "number" },
+        "photosBefore": { "type": "array", "items": { "type": "string" } },
+        "photosAfter": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string" },
+        "isPaid": { "type": "boolean" },
+        "transactionId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "providerId", "providerMatricule"]
     }
   },
   "firestore": {
@@ -117,6 +145,10 @@
     "/messages/{msgId}": {
       "schema": "message",
       "description": "Private messages."
+    },
+    "/missions/{missionId}": {
+      "schema": "mission",
+      "description": "Immutable registry of all missions."
     }
   }
 }

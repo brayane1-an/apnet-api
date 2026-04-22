@@ -16,10 +16,10 @@ const HERO_IMAGES = [
 interface ServiceCatalogProps {
   setView: (v: ViewState) => void;
   onSelectService: (category: string, subCategory: string, specialization: string) => void;
-  onRequestQuote: (category: string, subCategory: string) => void;
+  onRequestOrder: (category: string, subCategory: string, isDevis: boolean) => void;
 }
 
-export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ setView, onSelectService, onRequestQuote }) => {
+export const ServiceCatalog: React.FC<ServiceCatalogProps> = React.memo(({ setView, onSelectService, onRequestOrder }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
@@ -31,10 +31,10 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ setView, onSelec
 
   // Filtrer pour exclure "Communauté & Opportunités" (Stages) et l'Immobilier s'il était présent
   // On ne garde que les métiers "classiques"
-  const filteredCategories = SERVICE_CATEGORIES.filter(cat => 
+  const filteredCategories = React.useMemo(() => SERVICE_CATEGORIES.filter(cat => 
     cat.label !== 'Communauté & Opportunités' && 
     !cat.label.includes('Immobilier')
-  );
+  ), []);
 
   return (
     <div className="py-6">
@@ -150,7 +150,7 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ setView, onSelec
                             if (sub.label.includes("Livreur Privé")) {
                                 onSelectService(category.label, sub.label, '');
                             } else {
-                                onRequestQuote(category.label, sub.label);
+                                onRequestOrder(category.label, sub.label, true);
                             }
                         }}
                         className="flex-1 flex items-center justify-center gap-1 text-xs font-bold bg-green-50 text-green-700 py-2.5 rounded hover:bg-green-100 transition-colors"
@@ -160,7 +160,11 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ setView, onSelec
                       </button>
                       <button 
                         onClick={() => {
-                          onSelectService(category.label, sub.label, '');
+                          if (sub.label.includes("Livreur Privé")) {
+                            onSelectService(category.label, sub.label, '');
+                          } else {
+                            onRequestOrder(category.label, sub.label, false);
+                          }
                         }}
                         className="flex-1 flex items-center justify-center gap-1 text-xs font-bold bg-brand-orange text-white py-2.5 rounded hover:bg-orange-600 transition-colors"
                       >
@@ -197,4 +201,4 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ setView, onSelec
       </div>
     </div>
   );
-};
+});

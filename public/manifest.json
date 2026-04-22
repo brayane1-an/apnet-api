@@ -1,0 +1,24 @@
+{
+  "name": "APNET",
+  "short_name": "APNET",
+  "description": "APNET - Plateforme de Services & Emploi en Côte d'Ivoire",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FF7900",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://picsum.photos/seed/apnet-icon-192/192/192",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://picsum.photos/seed/apnet-icon-512/512/512",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
